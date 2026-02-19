@@ -479,7 +479,11 @@ class XAUUSDBot:
             result = mt5.order_send(request)
             
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                logging.error(f"❌ Order Failed: {result.comment} (Retcode: {result.retcode})")
+                if result.retcode == 10027:
+                    logging.error(f"❌ Order Failed: [10027] AutoTrading disabled by client! (กรุณากดปุ่ม 'Algo Trading' ใน MT5)")
+                else:
+                    logging.error(f"❌ Order Failed: {result.comment} (Retcode: {result.retcode})")
+                
                 self.last_error_time = time.time()
                 logging.info(f"⏳ Cooldown activated: Waiting 60s before retry...")
             else:

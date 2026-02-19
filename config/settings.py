@@ -157,7 +157,7 @@ class Config:
     # Trade only during high volume sessions (London & New York)
     # Thai Time (UTC+7): London opens ~13:00/14:00, NY opens ~19:00/20:00
     # Kill Zones: 13:00 - 23:00 (Focus on volume)
-    TRADING_START_HOUR = 13  # Start 13:00 (London Open)
+    TRADING_START_HOUR = 00  # Start 13:00 (London Open)
     TRADING_END_HOUR = 23    # Stop 23:00 (NY Session)
     
     # FORBIDDEN_HOURS is now replaced by the range above
