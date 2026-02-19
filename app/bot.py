@@ -318,7 +318,7 @@ class XAUUSDBot:
             logging.error(f"Partial Close Error: {e}")
             return False
 
-    def execute_trade(self, signal, atr=0.0, custom_sl=0.0):
+    def execute_trade(self, signal, reason="", indicators={}, atr=0.0, custom_sl=0.0):
         """Sends Buy/Sell orders to MT5 (Dynamic ATR SL/TP or Custom SL)"""
         try:
             # 0. SPREAD FILTER 🛡️
@@ -483,11 +483,52 @@ class XAUUSDBot:
                 self.last_error_time = time.time()
                 logging.info(f"⏳ Cooldown activated: Waiting 60s before retry...")
             else:
-                logging.info(f"✅ Order Executed: {signal} | Lot: {volume} | Price: {price} | SL: {sl:.2f} | TP: {tp:.2f} | Ticket: {result.order}")
+                # ✅ SUCCESS LOGGING
+                ind_str = " | ".join([f"{k}:{v}" for k,v in indicators.items()])
+                log_msg = (
+                    f"\n✅ Order Executed: {signal} | Ticket: {result.order}\n"
+                    f"   Price: {price} | Lot: {volume} | SL: {sl:.2f} | TP: {tp:.2f}\n"
+                    f"   Reason: {reason}\n"
+                    f"   Indicators: {ind_str}"
+                )
+                logging.info(log_msg)
+                
+                # Save to specific Entry Log
+                self.save_entry_log(result.order, signal, price, reason, indicators)
                 
         except Exception as e:
             logging.error(f"Execution Error: {e}")
             self.last_error_time = time.time() 
+
+    def save_entry_log(self, ticket, signal, price, reason, indicators):
+        """Saves detailed entry log to CSV"""
+        try:
+            data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+
+            filename = os.path.join(data_dir, 'entry_log.csv')
+            file_exists = os.path.isfile(filename)
+            
+            # Format Indicators as JSON-like string
+            ind_str = str(indicators).replace(",", " |").replace("{", "").replace("}", "").replace("'", "")
+            
+            with open(filename, mode='a', newline='', encoding='utf-8-sig') as file:
+                writer = csv.writer(file)
+                if not file_exists:
+                    writer.writerow(['Time', 'Ticket', 'Strategy', 'Type', 'Price', 'Reason', 'Indicators'])
+                
+                writer.writerow([
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    ticket,
+                    self.strategy_name,
+                    signal,
+                    price,
+                    reason,
+                    ind_str
+                ])
+        except Exception as e:
+            logging.error(f"Save Entry Log Error: {e}") 
 
     def modify_order(self, ticket, sl_price, tp_price):
         """Helper to modify SL/TP of an order"""
@@ -798,9 +839,22 @@ class XAUUSDBot:
                     
                     # 🖥️ DISPLAY LOGIC
                     current_time = time.time()
-                    if current_time - last_log_time >= (Config.CONSOLE_LOG_INTERVAL if hasattr(Config, 'CONSOLE_LOG_INTERVAL') else 5):
+                    if current_time - last_log_time >= 60: # Log every minute
+                        print(f"[{datetime.now().strftime('%H:%M')}] {status_detail} | Price: {price}")
                         last_log_time = current_time
 
+                    # ⚡ EXECUTE SIGNAL
+                    if signal in ["BUY", "SELL"]:
+                        # Prepare Indicators for Log (Filter out large objects like filtered arrays)
+                        log_indicators = {k: v for k, v in extra_data.items() if isinstance(v, (int, float, str))}
+                        
+                        self.execute_trade(
+                            signal=signal, 
+                            reason=status_detail, 
+                            indicators=log_indicators,
+                            atr=atr, 
+                            custom_sl=custom_sl
+                        )
                         # Get Active Orders
                         orders_summary = self.get_active_orders_summary()
                         if orders_summary == "No Active Orders":
@@ -826,9 +880,7 @@ class XAUUSDBot:
                         sys.stdout.flush()
 
                         if signal in ["BUY", "SELL"]:
-                             print(f"\n\n🔥 SIGNAL: {signal} | Price: {price:.2f}")
-                             self.execute_trade(signal, atr, custom_sl)
-                             print("") 
+                             # Removed redundant execution
                              last_log_time = 0                   
                 time.sleep(1 if Config.USE_REALTIME_CANDLE else 15)
                 

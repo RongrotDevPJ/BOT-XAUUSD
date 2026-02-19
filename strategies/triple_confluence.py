@@ -64,13 +64,13 @@ class TripleConfluenceStrategy(BaseStrategy):
         # --- ENTRY SIGNAL ---
         # ต้องครบ 3 เงื่อนไขเท่านั้น
         if is_uptrend and touched_lower and is_oversold:
-            status_detail = f"🟢 BUY SETUP | EMA✅ BB:Low✅ RSI:{rsi:.1f}✅"
+            status_detail = f"EMA Uptrend + BB Lower Touch + RSI Oversold ({rsi:.1f})"
             if not self.bot.check_open_positions():
                 signal = "BUY"
                 status_detail += " [GO! 🚀]"
                 
         elif is_downtrend and touched_upper and is_overbought:
-             status_detail = f"🔴 SELL SETUP | EMA✅ BB:High✅ RSI:{rsi:.1f}✅"
+             status_detail = f"EMA Downtrend + BB Upper Touch + RSI Overbought ({rsi:.1f})"
              if not self.bot.check_open_positions():
                 signal = "SELL"
                 status_detail += " [GO! 📉]"

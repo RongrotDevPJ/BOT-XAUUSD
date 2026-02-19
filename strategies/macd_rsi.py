@@ -97,7 +97,7 @@ class MACDRSIStrategy(BaseStrategy):
                     if buy_macd_cross and buy_rsi:
                          if not self.bot.check_open_positions():
                             signal = "BUY"
-                            status_detail += " [Trend Cross! 🚀]"
+                            status_detail = f"Trend Follow BUY | H1:{mtf_trend} MACD:CrossUP RSI:{rsi:.1f} ADX:{adx:.1f}"
                 elif not adx_ok:
                     status_detail += " [ADX Low]"
                 else:
@@ -117,7 +117,7 @@ class MACDRSIStrategy(BaseStrategy):
                     if sell_macd_cross and sell_rsi:
                         if not self.bot.check_open_positions():
                             signal = "SELL"
-                            status_detail += " [Trend Cross! 📉]"
+                            status_detail = f"Trend Follow SELL | H1:{mtf_trend} MACD:CrossDOWN RSI:{rsi:.1f} ADX:{adx:.1f}"
                 elif not adx_ok:
                     status_detail += " [ADX Low]"
                 else:
