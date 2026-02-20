@@ -23,8 +23,10 @@ class XAUUSDBot:
         self.connected = False
         self.last_error_time = 0
         self.strategy_name = strategy_name
+        self.server_time_offset = 0 # Calculated offset in hours
         
         # Initialize Magic Number (Offset to prevent conflict)
+
         self.magic_number = Config.MAGIC_NUM
         if strategy_name == "OB_FVG_FIBO":
             self.magic_number += 100 # Offset for SMC Strategy
@@ -78,6 +80,18 @@ class XAUUSDBot:
                     return False
             
             self.connected = True
+            
+            # --- CALCULATE SERVER TIME OFFSET ---
+            # Get current server time and local time to find difference
+            server_time = mt5.symbol_info_tick(self.symbol).time
+            if server_time > 0:
+                server_dt = datetime.fromtimestamp(server_time)
+                local_dt = datetime.now()
+                # Round to nearest hour
+                diff_seconds = (server_dt - local_dt).total_seconds()
+                self.server_time_offset = round(diff_seconds / 3600)
+                logging.info(f"🕒 Calculated Server Time Offset: {self.server_time_offset} hours")
+            
             logging.info(f"✅ Connected to MT5: {self.symbol}")
             return True
             
@@ -655,7 +669,9 @@ class XAUUSDBot:
         """Calculates total profit for the current day (My Strategy Only)"""
         try:
             now = datetime.now()
-            today_start = datetime(now.year, now.month, now.day)
+            # Use dynamic offset for server time window
+            server_now = now + timedelta(hours=self.server_time_offset)
+            today_start = datetime(server_now.year, server_now.month, server_now.day) - timedelta(hours=self.server_time_offset)
             
             deals = mt5.history_deals_get(today_start, now, group=self.symbol)
             
@@ -703,9 +719,10 @@ class XAUUSDBot:
     def save_trade_history(self):
         """Saves closed trades to CSV file (Backlog) - Prevents Duplicates"""
         try:
-            now = datetime.now() + timedelta(hours=1)
+            now = datetime.now() 
+            # Use dynamic offset (look back 1 day with buffer)
             today_start = datetime(now.year, now.month, now.day) - timedelta(days=1)
-            deals = mt5.history_deals_get(today_start, now)
+            deals = mt5.history_deals_get(today_start, now + timedelta(hours=1)) # Buffer for safety
             
             if not deals:
                 return
@@ -801,9 +818,9 @@ class XAUUSDBot:
                 # 0. Auto-Reconnect
                 terminal_info = mt5.terminal_info()
                 if terminal_info is None or not terminal_info.connected:
-                    print("\n⚠️ Connection lost, attempting to reconnect...")
+                    logging.warning("Connection lost, attempting to reconnect...")
                     if self.connect_mt5():
-                        print("✅ Reconnected successfully")
+                        logging.info("Reconnected successfully")
                     else:
                         time.sleep(5)
                         continue
@@ -811,8 +828,8 @@ class XAUUSDBot:
                 # 1. Daily Target Check
                 daily_profit = self.get_daily_profit()
                 if daily_profit >= Config.DAILY_PROFIT_TARGET:
-                     print(f"\n💰 Daily Target Reached! (${daily_profit:.2f} / ${Config.DAILY_PROFIT_TARGET})")
-                     print("💤 Sleeping until tomorrow...")
+                     logging.info(f"Daily Target Reached! (${daily_profit:.2f} / ${Config.DAILY_PROFIT_TARGET})")
+                     logging.info("Sleeping until tomorrow...")
                      time.sleep(3600) 
                      continue
 

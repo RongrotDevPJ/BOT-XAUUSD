@@ -44,15 +44,15 @@ class TripleConfluenceStrategy(BaseStrategy):
         is_uptrend = price_close > ema_200
         is_downtrend = price_close < ema_200
         
-        # 2. Value Filter (Bollinger Bands)
-        # Buy: Low touched/broke Lower Band
-        touched_lower = prev['low'] <= bb_lower
-        # Sell: High touched/broke Upper Band
-        touched_upper = prev['high'] >= bb_upper
+        # 2. & 3. Value and Momentum (Relaxed: Check last 3 candles)
+        lookback_window = df.iloc[row_index-2 : row_index+1] # Last 3 relative to row_index
         
-        # 3. Momentum Filter (RSI)
-        is_oversold = rsi < Config.RSI_OVERSOLD   # < 30
-        is_overbought = rsi > Config.RSI_OVERBOUGHT # > 70
+        touched_lower = any(lookback_window['low'] <= lookback_window['bb_lower'])
+        touched_upper = any(lookback_window['high'] >= lookback_window['bb_upper'])
+        
+        is_oversold = any(lookback_window['rsi'] < Config.RSI_OVERSOLD)
+        is_overbought = any(lookback_window['rsi'] > Config.RSI_OVERBOUGHT)
+
         
         # Check Trading Hours
         current_hour = datetime.datetime.now().hour

@@ -38,7 +38,16 @@ This bot is configured for a **$10 Start Capital**.
 -   `MIN_LOT`: 0.01 (Floor for small accounts)
 -   `FORBIDDEN_HOURS`: [4, 5] (Time filter for high spreads)
 
-## Strategy
--   **Trend**: EMA 50 > EMA 200 (Buy) / EMA 50 < EMA 200 (Sell).
--   **Momentum**: RSI > 50 (Buy) / RSI < 50 (Sell).
--   **Execution**: 1 Trade at a time.
+## Strategies
+The bot includes three specialized trading strategies:
+
+1.  **Triple Confluence (M5)**: A high-probability strategy using EMA 200, Bollinger Bands, and RSI. Optimized to capture momentum shifts at extreme value levels.
+2.  **MACD + RSI (M15/M5)**: A trend-following strategy using MACD crossovers confirmed by RSI and Volume (ADX).
+3.  **SMC - Order Blocks & FVG (M5)**: An advanced Smart Money Concepts strategy that identifies institutional supply/demand zones (Order Blocks) and Fair Value Gaps for sniper entries.
+
+## Risk Management
+- **Dynamic Lot Sizing**: Calculates lot size based on account balance or a fixed risk percentage per trade.
+- **Auto-Protection**: Includes Break Even (BE), Trailing Stops, and Partial Take Profit (Partial TP).
+- **Time Filters**: Automatic detection of high-volume sessions (London/NY) with dynamic server time sync.
+- **Safety**: Daily profit targets to prevent over-trading.
+

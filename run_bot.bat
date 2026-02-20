@@ -8,17 +8,19 @@ echo    XAUUSD TRADING BOT - MENU
 echo ==========================================
 echo 1. Run MACD + RSI Strategy (Classic)
 echo 2. Run SMC Strategy (Smart Money Concepts)
-echo 3. Run BOTH Strategies (Separate Windows) ⚠️ Risk x2
-echo 4. Install Dependencies (First Time Run)
-echo 5. Exit
+echo 3. Run Triple Confluence (EMA+BB+RSI) 🎯
+echo 4. Run ALL 3 Strategies (Separate Windows) 🔥🔥🔥
+echo 5. Install Dependencies (First Time Run)
+echo 6. Exit
 echo ==========================================
-set /p choice=Select Option (1-5): 
+set /p choice=Select Option (1-6): 
 
 if "%choice%"=="1" goto RUN_MACD
 if "%choice%"=="2" goto RUN_SMC
-if "%choice%"=="3" goto RUN_BOTH
-if "%choice%"=="4" goto INSTALL_DEPS
-if "%choice%"=="5" exit
+if "%choice%"=="3" goto RUN_TRIPLE
+if "%choice%"=="4" goto RUN_ALL
+if "%choice%"=="5" goto INSTALL_DEPS
+if "%choice%"=="6" exit
 
 echo Invalid choice. Please try again.
 pause
@@ -33,10 +35,16 @@ exit
 start "Bot: SMC (OB_FVG_FIBO)" python main.py --strategy OB_FVG_FIBO
 exit
 
-:RUN_BOTH
+:RUN_TRIPLE
+start "Bot: Triple Confluence" python main.py --strategy TRIPLE_CONFLUENCE
+exit
+
+:RUN_ALL
 start "Bot: MACD_RSI" python main.py --strategy MACD_RSI
 timeout /t 2 >nul
-start "Bot: SMC (OB_FVG_FIBO)" python main.py --strategy OB_FVG_FIBO
+start "Bot: SMC" python main.py --strategy OB_FVG_FIBO
+timeout /t 2 >nul
+start "Bot: Triple Confluence" python main.py --strategy TRIPLE_CONFLUENCE
 exit
 
 :INSTALL_DEPS

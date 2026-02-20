@@ -10,10 +10,11 @@ def main():
         print("Please select a trading strategy:")
         print("1. MACD + RSI (Classic Trend & Momentum) 📊")
         print("2. OB + FVG + FIBO (Smart Money Concept) 🧠")
+        print("3. Triple Confluence (EMA + BB + RSI) 🎯")
         print("0. Exit")
         print("=========================================")
         
-        choice = input("Enter choice (1-2): ").strip()
+        choice = input("Enter choice (1-3): ").strip()
         
         if choice == '1':
             print("\n🚀 Launching MACD/RSI Strategy...")
@@ -21,6 +22,10 @@ def main():
         elif choice == '2':
             print("\n🧠 Launching OB/FVG/FIBO Strategy...")
             os.system(f"{sys.executable} main.py --strategy OB_FVG_FIBO")
+        elif choice == '3':
+            print("\n🎯 Launching Triple Confluence Strategy...")
+            os.system(f"{sys.executable} main.py --strategy TRIPLE_CONFLUENCE")
+
         elif choice == '0':
             print("Goodbye! 👋")
             break

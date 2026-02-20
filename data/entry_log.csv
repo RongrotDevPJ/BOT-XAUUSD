@@ -1,0 +1,2 @@
+﻿Time,Ticket,Strategy,Type,Price,Reason,Indicators
+2026-02-19 21:00:15,6113965531,MACD_RSI,BUY,4996.17,Trend Follow BUY | H1:UP MACD:CrossUP RSI:54.7 ADX:26.9,price: np.float64(4997.03) | macd_line: np.float64(-2.004189092467641) | macd_signal: np.float64(-2.2405811198964907) | ema_trend: np.float64(4967.216099703788) | rsi: np.float64(54.684030036688185) | atr: np.float64(10.104285714285652) | adx: np.float64(26.945576702206605) | mtf_trend: UP

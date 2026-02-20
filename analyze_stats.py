@@ -1,13 +1,19 @@
 import pandas as pd
 from datetime import datetime
+import os
+
+# Get absolute path to the data directory
+base_dir = os.path.dirname(os.path.abspath(__file__))
+csv_path = os.path.join(base_dir, 'data', 'trade_history.csv')
 
 try:
     # Handle CSV schema change (Mixed 7 and 8 columns) by specifying names
     col_names = ['Time', 'Ticket', 'Type', 'Volume', 'Price', 'Profit', 'Comment', 'Status']
-    df = pd.read_csv(r'c:\Users\t-rongrot.but\Documents\Bot Trading XAUUSD\data\trade_history.csv', 
+    df = pd.read_csv(csv_path, 
                      names=col_names, 
                      header=None, # We'll skip header manually or filter it out
                      skiprows=1)  # Skip the original header row
+
     
     df['Time'] = pd.to_datetime(df['Time'])
     

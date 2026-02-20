@@ -27,13 +27,22 @@ def export_trade_history(days=365):
     try:
         if not connect_mt5(): return
 
+        # --- CALCULATE SERVER TIME OFFSET ---
+        server_time = mt5.symbol_info_tick(Config.SYMBOL).time
+        offset_hours = 0
+        if server_time > 0:
+            server_dt = datetime.fromtimestamp(server_time)
+            local_dt = datetime.now()
+            offset_hours = round((server_dt - local_dt).total_seconds() / 3600)
+            logging.info(f"🕒 Server Time Offset: {offset_hours} hours")
+
         # defined lookback period
-        to_date = datetime.now() + timedelta(hours=1) # Buffer for server time
+        to_date = datetime.now() + timedelta(hours=offset_hours) # Dynamic Offset
         from_date = to_date - timedelta(days=days)
         
         logging.info(f"⏳ Fetching Trade History from {from_date.date()}...")
         
-        # Get history (Fetch all, filter in Python for robustness)
+        # Get history
         deals = mt5.history_deals_get(from_date, to_date)
         
         if deals:
