@@ -42,12 +42,12 @@ class Config:
     TAKE_PROFIT_POINTS = 1000   # 🎯 FIXED TP: 1000 Points ($10) (RR 1:2)
     
     # 📱 Telegram Notifications
-    TELEGRAM_ENABLED = False     # Set to True to enable
-    TELEGRAM_TOKEN = ""          # API Token from @BotFather
-    TELEGRAM_CHAT_ID = ""        # Chat ID from @userinfobot
+    TELEGRAM_ENABLED = True     # Set to True to enable
+    TELEGRAM_TOKEN = "8505491177:AAHXBqmwreCbHKc88PWiuTQn-gut7NLC0Ec"          # API Token from @BotFather
+    TELEGRAM_CHAT_ID = "5511444214"        # Chat ID from @userinfobot
     
     # 🚫 Economic Calendar / News Filter
-    NEWS_FILTER_ENABLED = False  # Set to True to enable
+    NEWS_FILTER_ENABLED = True  # Set to True to enable
     NEWS_AVOID_MINUTES = 30      # Avoid trading 30 mins before/after news
     
     # --- Auto Risk Management (ATR Based) ---

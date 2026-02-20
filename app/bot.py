@@ -871,7 +871,7 @@ class XAUUSDBot:
         print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - INFO - ⚡ Mode: {'Realtime (Risk Repaint) 🚀' if Config.USE_REALTIME_CANDLE else 'Closed Candle (Safe) 🛡️'}")
         print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - INFO - Press Ctrl+C to stop")
         
-        last_log_time = 0
+        last_log_time = 0.0
         
         while True:
             try:
