@@ -7,6 +7,7 @@ import csv
 import os
 import sys
 import shutil
+import requests
 
 # Ensure project root is in path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,6 +17,7 @@ from utils.indicators import Indicators
 from strategies.macd_rsi import MACDRSIStrategy
 from strategies.ob_fvg_fibo import OBFVGFiboStrategy
 from strategies.triple_confluence import TripleConfluenceStrategy
+from utils.news_manager import NewsManager
 
 class XAUUSDBot:
     def __init__(self, strategy_name="TRIPLE_CONFLUENCE"):
@@ -50,6 +52,7 @@ class XAUUSDBot:
         self.partially_closed_tickets = set()
             
         # Connect
+        self.news_manager = NewsManager()
         if not self.connect_mt5():
             sys.exit(1)
             
@@ -98,6 +101,24 @@ class XAUUSDBot:
         except Exception as e:
             logging.error(f"Connection Exception: {e}")
             self.connected = False
+            
+    def send_telegram_message(self, message):
+        """Sends a notification to Telegram if enabled."""
+        if not Config.TELEGRAM_ENABLED or not Config.TELEGRAM_TOKEN or not Config.TELEGRAM_CHAT_ID:
+            return
+            
+        try:
+            url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/sendMessage"
+            payload = {
+                "chat_id": Config.TELEGRAM_CHAT_ID,
+                "text": message,
+                "parse_mode": "Markdown"
+            }
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code != 200:
+                logging.error(f"❌ Telegram Error: {response.text}")
+        except Exception as e:
+            logging.error(f"❌ Failed to send Telegram: {e}")
             return False
 
     def get_market_data(self, timeframe=None):
@@ -322,12 +343,18 @@ class XAUUSDBot:
             }
             
             result = mt5.order_send(request)
-            if result.retcode != mt5.TRADE_RETCODE_DONE:
+            if result.retcode == mt5.TRADE_RETCODE_DONE:
+                logging.info(f"✅ Partial Closed! Ticket: {ticket} | Closed Volume: {volume}")
+                self.send_telegram_message(
+                    f"💰 *PARTIAL PROFIT*\n"
+                    f"Ticket: `{ticket}`\n"
+                    f"Closed: `{volume} lots`\n"
+                    f"Remaining: `{result.volume} lots`"
+                )
+                return True
+            else:
                  logging.error(f"❌ Partial Close Failed: {result.comment}")
                  return False
-            else:
-                 logging.info(f"✅ Partial Closed: {ticket} ({volume} lots)")
-                 return True
         except Exception as e:
             logging.error(f"Partial Close Error: {e}")
             return False
@@ -511,6 +538,16 @@ class XAUUSDBot:
                 )
                 logging.info(log_msg)
                 
+                # Telegram Notification
+                self.send_telegram_message(
+                    f"🚀 *ORDER PLACED*\n"
+                    f"Type: `{signal}`\n"
+                    f"Price: `{price}`\n"
+                    f"Lot: `{volume}`\n"
+                    f"SL: `{sl:.2f}` | TP: `{tp:.2f}`\n"
+                    f"Reason: _{reason}_"
+                )
+                
                 # Save to specific Entry Log
                 self.save_entry_log(result.order, signal, price, reason, indicators)
                 
@@ -562,6 +599,14 @@ class XAUUSDBot:
             
             if result.retcode == mt5.TRADE_RETCODE_DONE:
                 logging.info(f"\n✨ Order Modified! Ticket: {ticket} -> SL: {sl_price:.2f} | TP: {tp_price:.2f}")
+                self.send_telegram_message(
+                    f"✨ *ORDER MODIFIED*\n"
+                    f"Ticket: `{ticket}`\n"
+                    f"New SL: `{sl_price:.2f}`\n"
+                    f"New TP: `{tp_price:.2f}`"
+                )
+                # Optional: Only notify on significant changes like Break Even
+                # Check BE triggers from check_trailing_stop vs current call to notify
                 return True
             elif result.retcode == mt5.TRADE_RETCODE_NO_CHANGES:
                 return True 
@@ -597,6 +642,7 @@ class XAUUSDBot:
                             if sl < (target_be - point): 
                                 if self.modify_order(ticket, target_be, tp):
                                     logging.info(f"⚡ Break Even Set! Ticket: {ticket}")
+                                    self.send_telegram_message(f"⚡ *BREAK EVEN SET*\nTicket: `{ticket}`\nSL moved to: `{target_be:.2f}`")
                                 continue 
                                 
                     elif order_type == 1: # SELL
@@ -605,6 +651,7 @@ class XAUUSDBot:
                             if sl > (target_be + point) or sl == 0:
                                 if self.modify_order(ticket, target_be, tp):
                                     logging.info(f"⚡ Break Even Set! Ticket: {ticket}")
+                                    self.send_telegram_message(f"⚡ *BREAK EVEN SET*\nTicket: `{ticket}`\nSL moved to: `{target_be:.2f}`")
                                 continue
 
                 if Config.ENABLE_PARTIAL_TP and ticket not in self.partially_closed_tickets:
@@ -636,7 +683,8 @@ class XAUUSDBot:
                         target_sl = price_current - trailing_dist
                         
                         if sl < target_sl and (target_sl - sl) >= (Config.TRAILING_STOP_STEP * point):
-                            self.modify_order(ticket, target_sl, tp)
+                            if self.modify_order(ticket, target_sl, tp):
+                                self.send_telegram_message(f"📈 *TRAILING SL MOVED (BUY)*\nTicket: `{ticket}`\nNew SL: `{target_sl:.2f}`")
 
                     if Config.ENABLE_DYNAMIC_TP:
                         dist_to_tp = (tp - price_current) / point
@@ -644,6 +692,7 @@ class XAUUSDBot:
                             new_tp = tp + (Config.TP_EXTENSION_DISTANCE * point)
                             if self.modify_order(ticket, sl, new_tp):
                                 logging.info(f"🚀 TP Extended! Ticket: {ticket} | Old TP: {tp} -> New TP: {new_tp}")
+                                self.send_telegram_message(f"🚀 *TP EXTENDED (BUY)*\nTicket: `{ticket}`\nNew TP: `{new_tp:.2f}`")
 
                 # SELL Order
                 elif order_type == 1:
@@ -653,7 +702,8 @@ class XAUUSDBot:
                         target_sl = price_current + trailing_dist
                         
                         if (sl > target_sl or sl == 0) and (sl == 0 or (sl - target_sl) >= (Config.TRAILING_STOP_STEP * point)):
-                            self.modify_order(ticket, target_sl, tp)
+                            if self.modify_order(ticket, target_sl, tp):
+                                self.send_telegram_message(f"📉 *TRAILING SL MOVED (SELL)*\nTicket: `{ticket}`\nNew SL: `{target_sl:.2f}`")
 
                     if Config.ENABLE_DYNAMIC_TP:
                         dist_to_tp = (price_current - tp) / point
@@ -661,6 +711,7 @@ class XAUUSDBot:
                             new_tp = tp - (Config.TP_EXTENSION_DISTANCE * point)
                             if self.modify_order(ticket, sl, new_tp):
                                 logging.info(f"🚀 TP Extended! Ticket: {ticket} | Old TP: {tp} -> New TP: {new_tp}")
+                                self.send_telegram_message(f"🚀 *TP EXTENDED (SELL)*\nTicket: `{ticket}`\nNew TP: `{new_tp:.2f}`")
                             
         except Exception as e:
             logging.error(f"Trailing Stop Error: {e}")
@@ -778,12 +829,21 @@ class XAUUSDBot:
                             if deal.profit >= 0:
                                 status = "Trailing SL/BE 🛡️"
                             else:
-                                status = "Stop Loss ❌"
+                                status = "SL Hit 🔴"
                         elif deal.reason == mt5.DEAL_REASON_CLIENT:
                             status = "Manual Close 👤"
                         elif deal.reason == mt5.DEAL_REASON_EXPERT:
                             status = "Bot Close 🤖"
 
+                        # Telegram Notification for Closed Deal
+                        self.send_telegram_message(
+                            f"🏁 *ORDER CLOSED*\n"
+                            f"Ticket: `{deal.ticket}`\n"
+                            f"Type: `{deal_type}`\n"
+                            f"Profit: `${deal.profit + deal.swap + deal.commission:.2f}`\n"
+                            f"Status: *{status}*"
+                        )
+                        
                         writer.writerow([
                             deal_time, 
                             deal.ticket, 
@@ -828,7 +888,9 @@ class XAUUSDBot:
                 # 1. Daily Target Check
                 daily_profit = self.get_daily_profit()
                 if daily_profit >= Config.DAILY_PROFIT_TARGET:
-                     logging.info(f"Daily Target Reached! (${daily_profit:.2f} / ${Config.DAILY_PROFIT_TARGET})")
+                     msg = f"💰 Daily Target Reached! (${daily_profit:.2f} / ${Config.DAILY_PROFIT_TARGET})"
+                     logging.info(msg)
+                     self.send_telegram_message(f"🏆 *GOAL REACHED*\n{msg}\n_Sleeping until tomorrow..._")
                      logging.info("Sleeping until tomorrow...")
                      time.sleep(3600) 
                      continue
@@ -850,6 +912,14 @@ class XAUUSDBot:
                         self.partially_closed_tickets.clear()
 
                 # 4. Get Data & Signal
+                # --- NEWS FILTER ---
+                if Config.NEWS_FILTER_ENABLED:
+                    is_news, news_title = self.news_manager.is_news_time(Config.NEWS_AVOID_MINUTES)
+                    if is_news:
+                        logging.warning(f"🚫 PAUSED: High Impact News ({news_title}) - Skipping Analysis")
+                        time.sleep(60)
+                        continue
+
                 df = self.get_market_data()
                 if df is not None:
                     signal, status_detail, extra_data = self.strategy.analyze(df)

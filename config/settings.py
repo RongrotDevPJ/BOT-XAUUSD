@@ -41,6 +41,15 @@ class Config:
     STOP_LOSS_POINTS = 500      # 🛡️ FXIED SL: 500 Points ($5) for Safety
     TAKE_PROFIT_POINTS = 1000   # 🎯 FIXED TP: 1000 Points ($10) (RR 1:2)
     
+    # 📱 Telegram Notifications
+    TELEGRAM_ENABLED = False     # Set to True to enable
+    TELEGRAM_TOKEN = ""          # API Token from @BotFather
+    TELEGRAM_CHAT_ID = ""        # Chat ID from @userinfobot
+    
+    # 🚫 Economic Calendar / News Filter
+    NEWS_FILTER_ENABLED = False  # Set to True to enable
+    NEWS_AVOID_MINUTES = 30      # Avoid trading 30 mins before/after news
+    
     # --- Auto Risk Management (ATR Based) ---
     ENABLE_AUTO_RISK = False    # ❌ Disable ATR SL (Use Fixed 500pts)
     ATR_SL_MULT = 1.2           # 🔧 M5: ลด Buffer เหลือ 1.2 (กันสะบัดน้อยลง)

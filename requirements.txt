@@ -3,3 +3,4 @@ pandas
 schedule
 streamlit
 plotly
+requests
