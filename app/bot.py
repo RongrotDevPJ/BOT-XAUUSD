@@ -31,7 +31,9 @@ class XAUUSDBot:
 
         self.magic_number = Config.MAGIC_NUM
         if strategy_name == "OB_FVG_FIBO":
-            self.magic_number += 100 # Offset for SMC Strategy
+            self.magic_number += 100 # SMC Strategy
+        elif strategy_name != "TRIPLE_CONFLUENCE":
+            self.magic_number += 200 # MACD Strategy (or others)
         
         # Initialize Strategy & Config Overrides
         self.config_overrides = {}
@@ -50,6 +52,7 @@ class XAUUSDBot:
             
         # Track partially closed tickets to prevent double triggers
         self.partially_closed_tickets = set()
+        self.last_trade_candle_time = None # 🛡️ Candle Guard
             
         # Connect
         self.news_manager = NewsManager()
@@ -123,7 +126,7 @@ class XAUUSDBot:
             payload = {
                 "chat_id": Config.TELEGRAM_CHAT_ID,
                 "text": message,
-                "parse_mode": "Markdown"
+                "parse_mode": "HTML"
             }
             response = requests.post(url, json=payload, timeout=10)
             if response.status_code != 200:
@@ -357,10 +360,10 @@ class XAUUSDBot:
             if result.retcode == mt5.TRADE_RETCODE_DONE:
                 logging.info(f"✅ Partial Closed! Ticket: {ticket} | Closed Volume: {volume}")
                 self.send_telegram_message(
-                    f"💰 *PARTIAL PROFIT*\n"
-                    f"Ticket: `{ticket}`\n"
-                    f"Closed: `{volume} lots`\n"
-                    f"Remaining: `{result.volume} lots`"
+                    f"💰 <b>PARTIAL PROFIT</b>\n"
+                    f"Ticket: <code>{ticket}</code>\n"
+                    f"Closed: <code>{volume} lots</code>\n"
+                    f"Remaining: <code>{result.volume} lots</code>"
                 )
                 return True
             else:
@@ -370,10 +373,9 @@ class XAUUSDBot:
             logging.error(f"Partial Close Error: {e}")
             return False
 
-    def execute_trade(self, signal, reason="", indicators={}, atr=0.0, custom_sl=0.0):
+    def execute_trade(self, signal, reason="", indicators={}, atr=0.0, custom_sl=0.0, candle_time=None):
         """Sends Buy/Sell orders to MT5 (Dynamic ATR SL/TP or Custom SL)"""
         try:
-            # 0. SPREAD FILTER 🛡️
             symbol_info = mt5.symbol_info(self.symbol)
             if symbol_info is None: return
             
@@ -549,18 +551,19 @@ class XAUUSDBot:
                 )
                 logging.info(log_msg)
                 
-                # Telegram Notification
-                self.send_telegram_message(
-                    f"🚀 *ORDER PLACED*\n"
-                    f"Type: `{signal}`\n"
-                    f"Price: `{price}`\n"
-                    f"Lot: `{volume}`\n"
-                    f"SL: `{sl:.2f}` | TP: `{tp:.2f}`\n"
-                    f"Reason: _{reason}_"
-                )
-                
                 # Save to specific Entry Log
                 self.save_entry_log(result.order, signal, price, reason, indicators)
+                self.last_trade_candle_time = candle_time # 🛡️ Mark candle as traded
+
+                # Telegram Notification
+                self.send_telegram_message(
+                    f"🚀 <b>ORDER PLACED</b>\n"
+                    f"Type: <code>{signal}</code>\n"
+                    f"Price: <code>{price}</code>\n"
+                    f"Lot: <code>{volume}</code>\n"
+                    f"SL: <code>{sl:.2f}</code> | TP: <code>{tp:.2f}</code>\n"
+                    f"Reason: <i>{reason}</i>"
+                )
                 
         except Exception as e:
             logging.error(f"Execution Error: {e}")
@@ -611,10 +614,10 @@ class XAUUSDBot:
             if result.retcode == mt5.TRADE_RETCODE_DONE:
                 logging.info(f"\n✨ Order Modified! Ticket: {ticket} -> SL: {sl_price:.2f} | TP: {tp_price:.2f}")
                 self.send_telegram_message(
-                    f"✨ *ORDER MODIFIED*\n"
-                    f"Ticket: `{ticket}`\n"
-                    f"New SL: `{sl_price:.2f}`\n"
-                    f"New TP: `{tp_price:.2f}`"
+                    f"✨ <b>ORDER MODIFIED</b>\n"
+                    f"Ticket: <code>{ticket}</code>\n"
+                    f"New SL: <code>{sl_price:.2f}</code>\n"
+                    f"New TP: <code>{tp_price:.2f}</code>"
                 )
                 # Optional: Only notify on significant changes like Break Even
                 # Check BE triggers from check_trailing_stop vs current call to notify
@@ -647,22 +650,26 @@ class XAUUSDBot:
 
                 # 1. Break Even (BE) Logic
                 if Config.ENABLE_BREAK_EVEN:
+                    # 🎯 Calculate dynamic BE trigger (e.g., 40% of TP distance)
+                    tp_dist_pts = abs(tp - price_open) / point if tp != 0 else Config.BREAK_EVEN_TRIGGER
+                    be_trigger_pts = tp_dist_pts * Config.BREAK_EVEN_PERCENT
+
                     if order_type == 0: # BUY
-                        if (price_current - price_open) / point > Config.BREAK_EVEN_TRIGGER:
+                        if (price_current - price_open) / point > be_trigger_pts:
                             target_be = price_open + (Config.BREAK_EVEN_LOCK * point)
                             if sl < (target_be - point): 
                                 if self.modify_order(ticket, target_be, tp):
-                                    logging.info(f"⚡ Break Even Set! Ticket: {ticket}")
-                                    self.send_telegram_message(f"⚡ *BREAK EVEN SET*\nTicket: `{ticket}`\nSL moved to: `{target_be:.2f}`")
+                                    logging.info(f"⚡ Break Even Set! Ticket: {ticket} (Triggered at {be_trigger_pts:.0f} pts)")
+                                    self.send_telegram_message(f"⚡ <b>BREAK EVEN SET</b>\nTicket: <code>{ticket}</code>\nSL moved to: <code>{target_be:.2f}</code>")
                                 continue 
                                 
                     elif order_type == 1: # SELL
-                        if (price_open - price_current) / point > Config.BREAK_EVEN_TRIGGER:
+                        if (price_open - price_current) / point > be_trigger_pts:
                             target_be = price_open - (Config.BREAK_EVEN_LOCK * point)
                             if sl > (target_be + point) or sl == 0:
                                 if self.modify_order(ticket, target_be, tp):
-                                    logging.info(f"⚡ Break Even Set! Ticket: {ticket}")
-                                    self.send_telegram_message(f"⚡ *BREAK EVEN SET*\nTicket: `{ticket}`\nSL moved to: `{target_be:.2f}`")
+                                    logging.info(f"⚡ Break Even Set! Ticket: {ticket} (Triggered at {be_trigger_pts:.0f} pts)")
+                                    self.send_telegram_message(f"⚡ <b>BREAK EVEN SET</b>\nTicket: <code>{ticket}</code>\nSL moved to: <code>{target_be:.2f}</code>")
                                 continue
 
                 if Config.ENABLE_PARTIAL_TP and ticket not in self.partially_closed_tickets:
@@ -695,7 +702,7 @@ class XAUUSDBot:
                         
                         if sl < target_sl and (target_sl - sl) >= (Config.TRAILING_STOP_STEP * point):
                             if self.modify_order(ticket, target_sl, tp):
-                                self.send_telegram_message(f"📈 *TRAILING SL MOVED (BUY)*\nTicket: `{ticket}`\nNew SL: `{target_sl:.2f}`")
+                                self.send_telegram_message(f"📈 <b>TRAILING SL MOVED (BUY)</b>\nTicket: <code>{ticket}</code>\nNew SL: <code>{target_sl:.2f}</code>")
 
                     if Config.ENABLE_DYNAMIC_TP:
                         dist_to_tp = (tp - price_current) / point
@@ -703,7 +710,7 @@ class XAUUSDBot:
                             new_tp = tp + (Config.TP_EXTENSION_DISTANCE * point)
                             if self.modify_order(ticket, sl, new_tp):
                                 logging.info(f"🚀 TP Extended! Ticket: {ticket} | Old TP: {tp} -> New TP: {new_tp}")
-                                self.send_telegram_message(f"🚀 *TP EXTENDED (BUY)*\nTicket: `{ticket}`\nNew TP: `{new_tp:.2f}`")
+                                self.send_telegram_message(f"🚀 <b>TP EXTENDED (BUY)</b>\nTicket: <code>{ticket}</code>\nNew TP: <code>{new_tp:.2f}</code>")
 
                 # SELL Order
                 elif order_type == 1:
@@ -714,7 +721,7 @@ class XAUUSDBot:
                         
                         if (sl > target_sl or sl == 0) and (sl == 0 or (sl - target_sl) >= (Config.TRAILING_STOP_STEP * point)):
                             if self.modify_order(ticket, target_sl, tp):
-                                self.send_telegram_message(f"📉 *TRAILING SL MOVED (SELL)*\nTicket: `{ticket}`\nNew SL: `{target_sl:.2f}`")
+                                self.send_telegram_message(f"📉 <b>TRAILING SL MOVED (SELL)</b>\nTicket: <code>{ticket}</code>\nNew SL: <code>{target_sl:.2f}</code>")
 
                     if Config.ENABLE_DYNAMIC_TP:
                         dist_to_tp = (price_current - tp) / point
@@ -722,7 +729,7 @@ class XAUUSDBot:
                             new_tp = tp - (Config.TP_EXTENSION_DISTANCE * point)
                             if self.modify_order(ticket, sl, new_tp):
                                 logging.info(f"🚀 TP Extended! Ticket: {ticket} | Old TP: {tp} -> New TP: {new_tp}")
-                                self.send_telegram_message(f"🚀 *TP EXTENDED (SELL)*\nTicket: `{ticket}`\nNew TP: `{new_tp:.2f}`")
+                                self.send_telegram_message(f"🚀 <b>TP EXTENDED (SELL)</b>\nTicket: <code>{ticket}</code>\nNew TP: <code>{new_tp:.2f}</code>")
                             
         except Exception as e:
             logging.error(f"Trailing Stop Error: {e}")
@@ -848,11 +855,11 @@ class XAUUSDBot:
 
                         # Telegram Notification for Closed Deal
                         self.send_telegram_message(
-                            f"🏁 *ORDER CLOSED*\n"
-                            f"Ticket: `{deal.ticket}`\n"
-                            f"Type: `{deal_type}`\n"
-                            f"Profit: `${deal.profit + deal.swap + deal.commission:.2f}`\n"
-                            f"Status: *{status}*"
+                            f"🏁 <b>ORDER CLOSED</b>\n"
+                            f"Ticket: <code>{deal.ticket}</code>\n"
+                            f"Type: <code>{deal_type}</code>\n"
+                            f"Profit: <code>${deal.profit + deal.swap + deal.commission:.2f}</code>\n"
+                            f"Status: <b>{status}</b>"
                         )
                         
                         writer.writerow([
@@ -910,7 +917,7 @@ class XAUUSDBot:
                 if daily_profit >= Config.DAILY_PROFIT_TARGET:
                      msg = f"💰 Daily Target Reached! (${daily_profit:.2f} / ${Config.DAILY_PROFIT_TARGET})"
                      logging.info(msg)
-                     self.send_telegram_message(f"🏆 *GOAL REACHED*\n{msg}\n_Sleeping until tomorrow..._")
+                     self.send_telegram_message(f"🏆 <b>GOAL REACHED</b>\n{msg}\n<i>Sleeping until tomorrow...</i>")
                      logging.info("Sleeping until tomorrow...")
                      time.sleep(3600) 
                      continue
@@ -954,18 +961,24 @@ class XAUUSDBot:
                         print(f"[{datetime.now().strftime('%H:%M')}] {status_detail} | Price: {price}")
                         last_log_time = current_time
 
-                    # ⚡ EXECUTE SIGNAL
                     if signal in ["BUY", "SELL"]:
-                        # Prepare Indicators for Log (Filter out large objects like filtered arrays)
-                        log_indicators = {k: v for k, v in extra_data.items() if isinstance(v, (int, float, str))}
-                        
-                        self.execute_trade(
-                            signal=signal, 
-                            reason=status_detail, 
-                            indicators=log_indicators,
-                            atr=atr, 
-                            custom_sl=custom_sl
-                        )
+                        # 🛡️ ONE TRADE PER CANDLE GUARD
+                        current_candle_time = df.iloc[-1]['time']
+                        if self.last_trade_candle_time == current_candle_time:
+                            # Already traded this candle, skip re-entry
+                            pass
+                        else:
+                            # Prepare Indicators for Log (Filter out large objects like filtered arrays)
+                            log_indicators = {k: v for k, v in extra_data.items() if isinstance(v, (int, float, str))}
+                            
+                            self.execute_trade(
+                                signal=signal, 
+                                reason=status_detail, 
+                                indicators=log_indicators,
+                                atr=atr, 
+                                custom_sl=custom_sl,
+                                candle_time=current_candle_time
+                            )
                         # Get Active Orders
                         orders_summary = self.get_active_orders_summary()
                         if orders_summary == "No Active Orders":

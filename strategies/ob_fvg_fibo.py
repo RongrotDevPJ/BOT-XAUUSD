@@ -142,7 +142,7 @@ class OBFVGFiboStrategy(BaseStrategy):
                         else: calculated_sl = price - (atr * 2)
                         
                         # TP
-                        calculated_tp = tp_target if tp_target > 0 else (price + (price - calculated_sl)*2)
+                        calculated_tp = tp_target if tp_target > 0 else (price + (price - calculated_sl) * Config.RISK_REWARD_RATIO)
                         
                   else:
                     missing = []
@@ -205,7 +205,7 @@ class OBFVGFiboStrategy(BaseStrategy):
                         
                         # Fix TP Calculation: Ensure positive distance
                         sl_dist = abs(calculated_sl - price)
-                        calculated_tp = tp_target if tp_target > 0 else (price - (sl_dist * 2))
+                        calculated_tp = tp_target if tp_target > 0 else (price - (sl_dist * Config.RISK_REWARD_RATIO))
 
                  else:
                     missing = []

@@ -1,4 +1,9 @@
 import MetaTrader5 as mt5
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class Config:
     #Directory: c:\Users\t-rongrot.but\Documents\Bot Trading XAUUSD\
@@ -39,12 +44,12 @@ class Config:
     # 🎯 3. SETTINGS: TARGETS & LIMITS (เป้าหมาย)
     # =========================================
     STOP_LOSS_POINTS = 500      # 🛡️ FXIED SL: 500 Points ($5) for Safety
-    TAKE_PROFIT_POINTS = 1000   # 🎯 FIXED TP: 1000 Points ($10) (RR 1:2)
+    TAKE_PROFIT_POINTS = 1250   # 🎯 FIXED TP: 1250 Points (RR 1:2.5)
     
     # 📱 Telegram Notifications
     TELEGRAM_ENABLED = True     # Set to True to enable
-    TELEGRAM_TOKEN = "8505491177:AAHXBqmwreCbHKc88PWiuTQn-gut7NLC0Ec"          # API Token from @BotFather
-    TELEGRAM_CHAT_ID = "5511444214"        # Chat ID from @userinfobot
+    TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')          # API Token from @BotFather
+    TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')        # Chat ID from @userinfobot
     
     # 🚫 Economic Calendar / News Filter
     NEWS_FILTER_ENABLED = True  # Set to True to enable
@@ -60,8 +65,8 @@ class Config:
     # --- Swing High/Low Strategy ---
     USE_SWING_SL = False        # ❌ Disable Swing SL (Use Fixed 500pts for controlled risk)
     SWING_LOOKBACK = 20         # ย้อนหลังกี่แท่งเพื่อหา Swing High/Low
-    RISK_REWARD_RATIO = 2.0     # TP ต้องเป็น 2 เท่าของ SL (RR 1:2) 📈 🎯
-    MAX_SL_POINTS = 400         # 🛡️ M5: จำกัด Max SL 400 จุด (ถ้าเกินไม่เล่น)
+    RISK_REWARD_RATIO = 2.5     # TP ต้องเป็น 2.5 เท่าของ SL (RR 1:2.5) 📈 🎯
+    MAX_SL_POINTS = 500         # 🛡️ M5: จำกัด Max SL 500 จุด (ถ้าเกินไม่เล่น)
 
     # =========================================
     # 🛡️ 4. SETTINGS: TRAILING STOP (ล็อกกำไร)
@@ -72,7 +77,8 @@ class Config:
     
     # --- Break Even (BE) Logic ---
     ENABLE_BREAK_EVEN = True    # เปิดใช้ระบบขยับ SL บังทุน
-    BREAK_EVEN_TRIGGER = 200    # 🔧 M5: บังทุนเร็วขึ้นที่ 200 จุด
+    BREAK_EVEN_TRIGGER = 200    # (Legacy/Fallback)
+    BREAK_EVEN_PERCENT = 0.4    # 🎯 บังทุนเมื่อกำไรถึง 40% ของระยะ TP
     BREAK_EVEN_LOCK = 20        # ล็อคกำไรขั้นต่ำ 20 จุด
     
     # --- Dynamic TP Extension (TP1 -> TP2) ---
@@ -93,19 +99,19 @@ class Config:
     MACD_CONFIG = {
         'TIMEFRAME': mt5.TIMEFRAME_M15,
         'STOP_LOSS_POINTS': 400,
-        'TAKE_PROFIT_POINTS': 800,
+        'TAKE_PROFIT_POINTS': 1000,
         'ATR_SL_MULT': 1.5,
-        'ATR_TP_MULT': 3.0,
-        'MAX_SL_POINTS': 600,
+        'ATR_TP_MULT': 3.75, # 1.5 * 2.5
+        'MAX_SL_POINTS': 500,
     }
     
     SMC_CONFIG = {
         'TIMEFRAME': mt5.TIMEFRAME_M5,
         'STOP_LOSS_POINTS': 300,
-        'TAKE_PROFIT_POINTS': 600,
+        'TAKE_PROFIT_POINTS': 750,
         'ATR_SL_MULT': 1.2,
-        'ATR_TP_MULT': 2.4,
-        'MAX_SL_POINTS': 400,
+        'ATR_TP_MULT': 3.0, # 1.2 * 2.5
+        'MAX_SL_POINTS': 500,
     }
 
     # =========================================
