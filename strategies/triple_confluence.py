@@ -44,8 +44,8 @@ class TripleConfluenceStrategy(BaseStrategy):
         is_uptrend = price_close > ema_200
         is_downtrend = price_close < ema_200
         
-        # 2. & 3. Value and Momentum (Relaxed: Check last 3 candles)
-        lookback_window = df.iloc[row_index-2 : row_index+1] # Last 3 relative to row_index
+        # 2. & 3. Value and Momentum (Relaxed: Check last 5 candles for confluence)
+        lookback_window = df.iloc[row_index-4 : row_index+1] # Last 5 relative to row_index
         
         touched_lower = any(lookback_window['low'] <= lookback_window['bb_lower'])
         touched_upper = any(lookback_window['high'] >= lookback_window['bb_upper'])
@@ -55,31 +55,29 @@ class TripleConfluenceStrategy(BaseStrategy):
 
         
         # Check Trading Hours
-        current_hour = datetime.datetime.now().hour
+        server_time = self.bot.get_server_time()
+        current_hour = server_time.hour
         is_trading_time = Config.TRADING_START_HOUR <= current_hour <= Config.TRADING_END_HOUR
         
         if not is_trading_time:
-             return "SLEEP", "💤 Sleeping (Time)", extra_data
+             return "SLEEP", f"💤 Sleeping (Time) | Server Time: {server_time.strftime('%H:%M')}", extra_data
 
         # --- ENTRY SIGNAL ---
         # ต้องครบ 3 เงื่อนไขเท่านั้น
         if is_uptrend and touched_lower and is_oversold:
-            status_detail = f"EMA Uptrend + BB Lower Touch + RSI Oversold ({rsi:.1f})"
+            status_detail = f"🚀 BUY | TRPL | Up + BB Low | RSI:{rsi:.1f}"
             if not self.bot.check_open_positions():
                 signal = "BUY"
-                status_detail += " [GO! 🚀]"
                 
         elif is_downtrend and touched_upper and is_overbought:
-             status_detail = f"EMA Downtrend + BB Upper Touch + RSI Overbought ({rsi:.1f})"
+             status_detail = f"📉 SELL | TRPL | Down + BB Up | RSI:{rsi:.1f}"
              if not self.bot.check_open_positions():
                 signal = "SELL"
-                status_detail += " [GO! 📉]"
         else:
             # Status for monitoring
-            if is_uptrend: trend_str = "UP"
-            elif is_downtrend: trend_str = "DOWN"
-            else: trend_str = "FLAT"
+            trend_str = "UP" if is_uptrend else ("DOWN" if is_downtrend else "FLAT")
+            bb_str = "Lower" if touched_lower else ("Upper" if touched_upper else "Mid")
             
-            status_detail = f"⚪ WAIT | Trend:{trend_str} RSI:{rsi:.1f}"
+            status_detail = f"⚪ TRPL | T:{trend_str} | BB:{bb_str} | RSI:{rsi:.1f}"
 
         return signal, status_detail, extra_data

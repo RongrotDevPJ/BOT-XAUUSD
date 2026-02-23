@@ -15,13 +15,15 @@ class OBFVGFiboStrategy(BaseStrategy):
         prev_row = df.iloc[row_index]
         price = prev_row['close']
         atr = prev_row['atr']
+        rsi = prev_row['rsi']
         
         # --- TIME FILTER (KILL ZONES) ---
-        current_hour = datetime.now().hour
+        server_time = self.bot.get_server_time()
+        current_hour = server_time.hour
         is_kill_zone = Config.TRADING_START_HOUR <= current_hour <= Config.TRADING_END_HOUR
         
         if not is_kill_zone:
-            return "WAIT", f"Outside Kill Zone ({Config.TRADING_START_HOUR}:00-{Config.TRADING_END_HOUR}:00)", {}
+            return "WAIT", f"Outside Kill Zone ({Config.TRADING_START_HOUR}:00-{Config.TRADING_END_HOUR}:00) | Server Time: {server_time.strftime('%H:%M')}", {}
         
         # 1. Indicators & Patterns
         smc_lookback = self.bot.get_setting('SMC_LOOKBACK') if self.bot.get_setting('SMC_LOOKBACK') else Config.SMC_LOOKBACK
@@ -124,11 +126,16 @@ class OBFVGFiboStrategy(BaseStrategy):
              if is_fibo_match and is_ob_match: match_type = "Golden"
              
              if is_discount:
-                 if candlestick_conf and smc_conf:
+                  is_golden_zone = is_ob_match and is_fibo_match
+                  
+                  if (candlestick_conf and smc_conf) or (is_golden_zone and smc_conf):
                     if not self.bot.check_open_positions():
                         signal = "BUY"
-                        why = f"{pattern} + {'IDM' if has_idm_sweep else 'MSS'}"
-                        status_detail = f"BUY [{match_type} | {why}]"
+                        if is_golden_zone and not candlestick_conf:
+                            why = "Golden Setup"
+                        else:
+                            why = f"{pattern}"
+                        status_detail = f"🚀 BUY | SMC | {why} | R:{rsi:.1f} | IDM/MSS Sync"
                         
                         # SL
                         if bull_ob: calculated_sl = bull_ob[1] - (atr * 0.5)
@@ -137,7 +144,7 @@ class OBFVGFiboStrategy(BaseStrategy):
                         # TP
                         calculated_tp = tp_target if tp_target > 0 else (price + (price - calculated_sl)*2)
                         
-                 else:
+                  else:
                     missing = []
                     if not candlestick_conf: missing.append("Candle")
                     if not smc_conf: missing.append("IDM/MSS")
@@ -182,11 +189,16 @@ class OBFVGFiboStrategy(BaseStrategy):
              smc_conf = has_idm_sweep or (mss == "BEAR_MSS")
 
              if is_premium:
-                 if candlestick_conf and smc_conf:
-                     if not self.bot.check_open_positions():
+                 is_golden_zone = is_sell_ob and is_sell_fibo
+                 
+                 if (candlestick_conf and smc_conf) or (is_golden_zone and smc_conf):
+                      if not self.bot.check_open_positions():
                         signal = "SELL"
-                        why = f"{pattern} + {'IDM' if has_idm_sweep else 'MSS'}"
-                        status_detail = f"SELL [{match_type} | {why}]"
+                        if is_golden_zone and not candlestick_conf:
+                            why = "Golden Setup"
+                        else:
+                            why = f"{pattern}"
+                        status_detail = f"📉 SELL | SMC | {why} | R:{rsi:.1f} | IDM/MSS Sync"
                         
                         if bear_ob: calculated_sl = bear_ob[0] + (atr * 0.5)
                         else: calculated_sl = price + (atr * 2)
@@ -204,10 +216,10 @@ class OBFVGFiboStrategy(BaseStrategy):
                  status_detail = f"WAIT [{match_type} but in DISCOUNT Zone ❌]"
 
         if signal == "WAIT" and is_kill_zone:
+            icon = "🟢" if is_discount else "🔴"
             status_detail = (
-                f"KZ:ON | "
-                f"Zone:{'🟢Disc' if is_discount else '🔴Prem'} | "
-                f"IDM:{'✅' if has_idm_sweep else '❌'} | "
+                f"⚪ SMC | {icon} {'DISC' if is_discount else 'PREM'} | "
+                f"R:{rsi:.1f} | IDM:{'✅' if has_idm_sweep else '❌'} | "
                 f"MSS:{mss if mss else 'None'}"
             )
 

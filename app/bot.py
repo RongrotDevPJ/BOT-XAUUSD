@@ -101,6 +101,17 @@ class XAUUSDBot:
         except Exception as e:
             logging.error(f"Connection Exception: {e}")
             self.connected = False
+            return False
+
+    def get_server_time(self):
+        """Returns current MT5 server time as datetime object"""
+        try:
+            tick = mt5.symbol_info_tick(self.symbol)
+            if tick:
+                return datetime.fromtimestamp(tick.time)
+            return datetime.now() + timedelta(hours=self.server_time_offset)
+        except:
+            return datetime.now() + timedelta(hours=self.server_time_offset)
             
     def send_telegram_message(self, message):
         """Sends a notification to Telegram if enabled."""
@@ -879,10 +890,19 @@ class XAUUSDBot:
                 terminal_info = mt5.terminal_info()
                 if terminal_info is None or not terminal_info.connected:
                     logging.warning("Connection lost, attempting to reconnect...")
-                    if self.connect_mt5():
-                        logging.info("Reconnected successfully")
-                    else:
-                        time.sleep(5)
+                    reconnect_attempts = 0
+                    while reconnect_attempts < 5:
+                        if self.connect_mt5():
+                            logging.info("Reconnected successfully")
+                            break
+                        reconnect_attempts += 1
+                        wait_time = min(pow(2, reconnect_attempts), 30)
+                        logging.info(f"Reconnect attempt {reconnect_attempts} failed. Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    
+                    if not self.connected:
+                        logging.error("Failed to reconnect after multiple attempts. Waiting 60s...")
+                        time.sleep(60)
                         continue
 
                 # 1. Daily Target Check
