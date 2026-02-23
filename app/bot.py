@@ -677,19 +677,21 @@ class XAUUSDBot:
                     if order_type == 0: current_profit_points = (price_current - price_open) / point
                     else: current_profit_points = (price_open - price_current) / point
                     
-                    # Use RR 1:1 or Fixed Points for Partial
-                    trigger_points = Config.BREAK_EVEN_TRIGGER # Use same as BE for consistency
+                    # 🎯 Partial Close Trigger at 1:1 RR (Distance equal to SL)
+                    sl_dist_pts = abs(sl - price_open) / point if sl != 0 else Config.STOP_LOSS_POINTS
+                    trigger_points = max(sl_dist_pts, 100) # Min 100pts safety
                     
                     if current_profit_points >= trigger_points:
                          if pos.volume >= (Config.MIN_LOT * 2): 
                              vol_to_close = round(pos.volume * Config.PARTIAL_TP_RATIO, 2)
                              if vol_to_close >= Config.MIN_LOT:
-                                 logging.info(f"💰 Partial TP Trigger! Profit: {current_profit_points:.0f}pts. Closing {vol_to_close} lots...")
+                                 logging.info(f"💰 Partial TP Trigger (1:1 RR)! Profit: {current_profit_points:.0f}pts. Closing {vol_to_close} lots...")
                                  if self.close_partial(ticket, vol_to_close):
                                      self.partially_closed_tickets.add(ticket)
-                                     # After Partial, ALWAYS set Break Even if not already
+                                     # After Partial, ALWAYS set Break Even to protect capital
                                      target_be = price_open + (Config.BREAK_EVEN_LOCK * point) if order_type == 0 else price_open - (Config.BREAK_EVEN_LOCK * point)
-                                     self.modify_order(ticket, target_be, tp)
+                                     if self.modify_order(ticket, target_be, tp):
+                                         self.send_telegram_message(f"💰 <b>PARTIAL TP (1:1 RR)</b>\nTicket: <code>{ticket}</code>\nClosed: <code>{vol_to_close}</code> lots\nSL moved to BE.")
                                      continue 
 
                 # 2. Trailing Stop Logic (Dynamic)

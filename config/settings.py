@@ -155,8 +155,8 @@ class Config:
     RSI_SELL_MAX = 50      # Sell: RSI < 50 (แรงขายเริ่มมา)
     RSI_SNIPER_BUY_MIN = 42 # 🎯 Sniper Buy: RSI > 42 (เข้าไวขึ้นเมื่อแตะ OB)
     RSI_SNIPER_SELL_MAX = 58 # 🎯 Sniper Sell: RSI < 58 (เข้าไวขึ้นเมื่อแตะ OB)
-    RSI_OVERBOUGHT = 70    # Don't Buy above this
-    RSI_OVERSOLD = 30      # Don't Sell below this
+    RSI_OVERBOUGHT = 65    # Adjusted from 70 for more entries
+    RSI_OVERSOLD = 35      # Adjusted from 30 for more entries
     
     # Bollinger Bands
     BB_PERIOD = 20         # เส้นกลาง SMA 20
