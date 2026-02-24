@@ -11,17 +11,15 @@ class Config:
     # =========================================
     # 🔧 1. SETTINGS: GENERAL (ตั้งค่าทั่วไป)
     # =========================================
-    MAX_BALANCE_RISK = 5.0      # ⚠️ เสี่ยงสูงสุด 5% ของพอร์ต (ป้องกันพอร์ตแตก)
-    
     # --- Filter: Trading Filters ---
     MAX_SPREAD_POINTS = 50      # ❗ กรอง Spread ไม่ให้เกิน 50 จุด (กันช่วงข่าว/ตลาดเปิด)
     SYMBOL = "XAUUSD"
+
     TIMEFRAME = mt5.TIMEFRAME_M5   # 🚀 Timeframe: M5 (Standard for Triple Confluence)
     MAGIC_NUM = 888888             # 🎱 Lucky Magic Number (Triple Confluence)
     DEVIATION = 20                 # ค่าความคลาดเคลื่อนที่ยอมรับได้ (Slippage)
-    TIMEOUT = 10                   # Timeout for connection (seconds)
-    CONSOLE_LOG_INTERVAL = 5       # ⏱️ Update console status every N seconds (Reduces spam)
     USE_REALTIME_CANDLE = False     # 🚀 True = เทรดแท่งปัจจุบัน (ไวแต่เสี่ยง Repaint), False = รอจบแท่ง (ชัวร์กว่า)
+
 
     # =========================================
     # 💰 2. SETTINGS: MONEY MANAGEMENT (บริหารเงินทุน)
@@ -50,7 +48,7 @@ class Config:
     TELEGRAM_ENABLED = True     # Set to True to enable
     TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')          # API Token from @BotFather
     TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')        # Chat ID from @userinfobot
-    
+
     # 🚫 Economic Calendar / News Filter
     NEWS_FILTER_ENABLED = True  # Set to True to enable
     NEWS_AVOID_MINUTES = 30      # Avoid trading 30 mins before/after news
@@ -77,9 +75,9 @@ class Config:
     
     # --- Break Even (BE) Logic ---
     ENABLE_BREAK_EVEN = True    # เปิดใช้ระบบขยับ SL บังทุน
-    BREAK_EVEN_TRIGGER = 200    # (Legacy/Fallback)
     BREAK_EVEN_PERCENT = 0.4    # 🎯 บังทุนเมื่อกำไรถึง 40% ของระยะ TP
     BREAK_EVEN_LOCK = 20        # ล็อคกำไรขั้นต่ำ 20 จุด
+
     
     # --- Dynamic TP Extension (TP1 -> TP2) ---
     ENABLE_DYNAMIC_TP = False   # 🚀 ปิดระบบขยาย TP (ใช้ RR 1:2 แบบคงที่ตามใจผู้ใช้)
@@ -169,14 +167,10 @@ class Config:
     # ⏳ 6. SETTINGS: TIME FILTER (ช่วงเวลาห้ามเทรด)
     # =========================================
     # --- 6. Time Filter (Session Trading) ---
-    # Trade only during high volume sessions (London & New York)
-    # Thai Time (UTC+7): London opens ~13:00/14:00, NY opens ~19:00/20:00
     # Kill Zones: 13:00 - 23:00 (Focus on volume)
     TRADING_START_HOUR = 00  # Start 13:00 (London Open)
     TRADING_END_HOUR = 23    # Stop 23:00 (NY Session)
-    
-    # FORBIDDEN_HOURS is now replaced by the range above
-    FORBIDDEN_HOURS = [] # Disabled
+
     
     # --- SMC Advanced Settings ---
     ENABLE_DYNAMIC_TP_SMC = True # ✅ Use Swing High/Low as TP (Target Liquidity)

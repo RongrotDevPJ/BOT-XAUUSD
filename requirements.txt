@@ -4,3 +4,4 @@ schedule
 streamlit
 plotly
 requests
+python-dotenv

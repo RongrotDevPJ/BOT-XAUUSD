@@ -14,10 +14,23 @@ class MT5Executor:
         self.filling_type = mt5.ORDER_FILLING_IOC # Default
 
     def connect(self):
-        """Initializes connection to MT5 and detects filling mode"""
-        if not mt5.initialize():
-            logging.error(f"mt5.initialize() failed, error code = {mt5.last_error()}")
-            return False
+        """Initializes connection to MT5 and detects filling mode with retry logic for IPC timeouts"""
+        max_retries = 3
+        for attempt in range(max_retries):
+            # If not first attempt, try shutting down before re-initializing
+            if attempt > 0:
+                mt5.shutdown()
+                import time
+                time.sleep(2) # Wait for terminal to settle
+                logging.warning(f"🔄 Re-connection attempt {attempt + 1}/{max_retries}...")
+
+            if mt5.initialize():
+                break
+            else:
+                error = mt5.last_error()
+                logging.error(f"mt5.initialize() failed, error code = {error}")
+                if attempt == max_retries - 1:
+                    return False
         
         symbol_info = mt5.symbol_info(config.SYMBOL)
         if symbol_info is None:

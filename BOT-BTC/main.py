@@ -180,8 +180,11 @@ def main():
                     can_trade, reason = executor.check_margin(config.SYMBOL, order_type, config.LOT_SIZE, price_exec)
                     if not can_trade:
                         logging.error(f"❌ Margin Check Failed: {reason}")
-                        send_notification(f"⚠️ บัญชีมีเงินไม่พอเปิดออเดอร์!\nต้องการ: {reason}")
-                        time.sleep(3600)
+                        acc_info = mt5.account_info()
+                        balance = acc_info.balance if acc_info else "N/A"
+                        send_notification(f"⚠️ เงินไม่พอเปิดออเดอร์!\nBalance: {balance}\nRequired: {reason}")
+                        # Sleep for a bit to avoid terminal spamming
+                        time.sleep(300)
                         continue
 
                     # --- SPREAD FILTER ---

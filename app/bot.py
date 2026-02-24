@@ -10,7 +10,8 @@ import shutil
 import requests
 
 # Ensure project root is in path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # Redundant if running from root
+
 
 from config.settings import Config
 from utils.indicators import Indicators

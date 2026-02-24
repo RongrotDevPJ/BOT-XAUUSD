@@ -26,7 +26,8 @@ class TradingLogic:
         ema_trend = last_row['ema_trend']
         
         # --- DETAILED LOGGING FOR TRANSPARENCY ---
-        status_msg = f"🔍 Analyzing Signal | RSI: {rsi_val:.2f} | Price: {close_price:.2f} | EMA200: {ema_trend:.2f}"
+        trend_status = "UP 📈" if close_price > ema_trend else "DOWN 📉"
+        status_msg = f"🔍 Signal check | RSI: {rsi_val:.2f} | Price: {close_price:.2f} | EMA200: {ema_trend:.2f} ({trend_status})"
         
         # BUY LOGIC
         if rsi_val < config.RSI_OVERSOLD:
@@ -34,7 +35,7 @@ class TradingLogic:
                 logging.info(f"{status_msg} 🟢 BUY SIGNAL DETECTED")
                 return 'buy'
             else:
-                logging.info(f"{status_msg} ⚠️ Buy Condition: RSI OK (<{config.RSI_OVERSOLD}), but Price is BELOW EMA200 (No Trend Up)")
+                logging.info(f"{status_msg} ⚠️ Skip BUY: RSI is Oversold but Price is below EMA200 (Requires Uptrend)")
         
         # SELL LOGIC
         elif rsi_val > config.RSI_OVERBOUGHT:
@@ -42,7 +43,7 @@ class TradingLogic:
                 logging.info(f"{status_msg} 🔴 SELL SIGNAL DETECTED")
                 return 'sell'
             else:
-                logging.info(f"{status_msg} ⚠️ Sell Condition: RSI OK (>{config.RSI_OVERBOUGHT}), but Price is ABOVE EMA200 (No Trend Down)")
+                logging.info(f"{status_msg} ⚠️ Skip SELL: RSI is Overbought but Price is above EMA200 (Requires Downtrend)")
         
         return None
 
