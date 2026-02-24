@@ -7,12 +7,29 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 csv_path = os.path.join(base_dir, 'data', 'trade_history.csv')
 
 try:
-    # Handle CSV schema change (Mixed 7 and 8 columns) by specifying names
-    col_names = ['Time', 'Ticket', 'Type', 'Volume', 'Price', 'Profit', 'Comment', 'Status']
-    df = pd.read_csv(csv_path, 
-                     names=col_names, 
-                     header=None, # We'll skip header manually or filter it out
-                     skiprows=1)  # Skip the original header row
+    # Handle CSV schema change (Mixed 8 and 9 columns)
+    # We read line by line to handle inconsistencies
+    rows = []
+    import csv
+    with open(csv_path, mode='r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        header = next(reader) # Skip header
+        for row in reader:
+            if not row: continue
+            if len(row) == 8:
+                # Old format: Time, Ticket, Type, Volume, Price, Profit, Comment, Status
+                # New format: Time, Ticket, Strategy, Type, Volume, Price, Profit, Comment, Status
+                # Inject "Legacy" into the Strategy column (index 2)
+                row.insert(2, "Legacy")
+            rows.append(row)
+            
+    col_names = ['Time', 'Ticket', 'Strategy', 'Type', 'Volume', 'Price', 'Profit', 'Comment', 'Status']
+    df = pd.DataFrame(rows, columns=col_names)
+    
+    # Convert numeric columns
+    numeric_cols = ['Volume', 'Price', 'Profit']
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
     
     df['Time'] = pd.to_datetime(df['Time'])
