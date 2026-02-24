@@ -2,7 +2,9 @@ import time
 import logging
 import os
 import csv
+import pandas as pd
 from datetime import datetime
+
 import MetaTrader5 as mt5
 from .execution import MT5Executor
 from .logic import TradingLogic
