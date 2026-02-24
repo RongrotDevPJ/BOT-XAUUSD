@@ -471,8 +471,7 @@ class Indicators:
                         swept = True
                         
             return swept
-                        
-            return swept
+
         except Exception as e:
             return False
 

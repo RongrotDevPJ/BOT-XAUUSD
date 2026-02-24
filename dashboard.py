@@ -56,6 +56,18 @@ if trades is None or market is None:
 # --- KPI METRICS ROW ---
 if not trades.empty:
     # ----------------------------------------------------
+    # 0. SYMBOL FILTER
+    # ----------------------------------------------------
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🎯 Filtering")
+    symbols = ['All'] + sorted(trades['symbol'].unique().tolist())
+    selected_symbol = st.sidebar.selectbox("Select Symbol", symbols)
+    
+    display_trades = trades.copy()
+    if selected_symbol != 'All':
+        display_trades = display_trades[display_trades['symbol'] == selected_symbol]
+
+    # ----------------------------------------------------
     # 1. TRADE STATUS CLASSIFICATION (TP vs SL vs BR)
     # ----------------------------------------------------
     def classify_trade(row):
@@ -74,20 +86,20 @@ if not trades.empty:
         else:
             return 'BE ➖'      # Break Even (Exactly 0)
 
-    trades['status'] = trades.apply(classify_trade, axis=1)
+    display_trades['status'] = display_trades.apply(classify_trade, axis=1)
 
     # Calculate Counts
-    status_counts = trades['status'].value_counts()
+    status_counts = display_trades['status'].value_counts()
     
-    total_trades = len(trades)
-    win_trades = len(trades[trades['profit'] > 0])
+    total_trades = len(display_trades)
+    win_trades = len(display_trades[display_trades['profit'] > 0])
     loss_trades = total_trades - win_trades
-    total_profit = trades['profit'].sum()
+    total_profit = display_trades['profit'].sum()
     win_rate = (win_trades / total_trades) * 100 if total_trades > 0 else 0
     
     # Calculate Profit Factor
-    gross_profit = trades[trades['profit'] > 0]['profit'].sum()
-    gross_loss = abs(trades[trades['profit'] < 0]['profit'].sum())
+    gross_profit = display_trades[display_trades['profit'] > 0]['profit'].sum()
+    gross_loss = abs(display_trades[display_trades['profit'] < 0]['profit'].sum())
     pf = gross_profit / gross_loss if gross_loss > 0 else 0
 
     col1, col2, col3, col4 = st.columns(4)
@@ -97,6 +109,8 @@ if not trades.empty:
     col4.metric("🔢 Total Trades", f"{total_trades}")
 else:
     st.info("No trades to display.")
+    display_trades = pd.DataFrame()
+
 
 st.markdown("---")
 
@@ -104,10 +118,10 @@ st.markdown("---")
 tab1, tab2, tab3 = st.tabs(["📈 Performance Analysis", "🕯️ Market Chart", "📝 Trade History"])
 
 with tab1:
-    if not trades.empty:
+    if not display_trades.empty:
         # Row 1: Equity Curve (Full Width)
-        st.subheader("📈 Profit Growth (Equity Curve)")
-        fig_equity = px.line(trades, x='time', y='cumulative_profit', markers=True)
+        st.subheader(f"📈 Profit Growth ({selected_symbol})")
+        fig_equity = px.line(display_trades, x='time', y='cumulative_profit', markers=True)
         fig_equity.update_traces(line_color='#00CC96', line_width=3)
         fig_equity.update_layout(xaxis_title="Time", yaxis_title="Balance Growth ($)", hovermode="x unified")
         st.plotly_chart(fig_equity, width="stretch")
@@ -117,7 +131,7 @@ with tab1:
         
         with c1:
             st.subheader("📅 Daily Profit/Loss")
-            daily_profit = trades.groupby('date')['profit'].sum().reset_index()
+            daily_profit = display_trades.groupby('date')['profit'].sum().reset_index()
             daily_profit['color'] = daily_profit['profit'].apply(lambda x: 'green' if x >= 0 else 'red')
             
             fig_daily = px.bar(
@@ -145,7 +159,7 @@ with tab1:
         with c2:
             st.subheader("🍰 Trade Result Breakdown")
             # Use Status Counts for Pie Chart
-            fig_pie = px.pie(trades, names='status', title='TP vs SL vs BR', hole=0.4, 
+            fig_pie = px.pie(display_trades, names='status', title='TP vs SL vs BR', hole=0.4, 
                              color='status',
                              color_discrete_map={
                                  'TP 🎯': '#00CC96',  # Green
@@ -158,7 +172,7 @@ with tab1:
             st.plotly_chart(fig_pie, width="stretch")
 
 with tab2:
-    st.subheader("🕯️ XAUUSD Price Chart (M15)")
+    st.subheader(f"🕯️ {selected_symbol if selected_symbol != 'All' else 'Market'} Price Chart")
     if not market.empty:
         # Show last 200 candles by default for performance
         recent_market = market.tail(200)
@@ -169,7 +183,7 @@ with tab2:
             high=recent_market['high'],
             low=recent_market['low'],
             close=recent_market['close'],
-            name='XAUUSD'
+            name=selected_symbol
         )])
         
         fig_candle.update_layout(height=600, xaxis_rangeslider_visible=False)
@@ -179,16 +193,17 @@ with tab2:
 
 with tab3:
     st.subheader("📝 Trade Log Details")
-    if not trades.empty:
+    if not display_trades.empty:
         # Filter Options
-        status_filter = st.multiselect("Filter by Status", options=trades['status'].unique(), default=trades['status'].unique())
-        filtered_df = trades[trades['status'].isin(status_filter)]
+        status_filter = st.multiselect("Filter by Status", options=display_trades['status'].unique(), default=display_trades['status'].unique())
+        filtered_df = display_trades[display_trades['status'].isin(status_filter)]
 
         # Style the dataframe
         def color_profit(val):
             return f'color: {"green" if val > 0 else "red"}'
 
-        styled_df = filtered_df[['time', 'ticket', 'type', 'status', 'volume', 'price', 'profit', 'comment']].sort_values(by='time', ascending=False)
+        styled_df = filtered_df[['time', 'ticket', 'symbol', 'type', 'status', 'volume', 'price', 'profit', 'comment']].sort_values(by='time', ascending=False)
         st.dataframe(styled_df.style.map(color_profit, subset=['profit']), width="stretch", height=600)
     else:
         st.info("No trade logs available.")
+

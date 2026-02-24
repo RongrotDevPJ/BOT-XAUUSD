@@ -95,6 +95,19 @@ def main():
     if not executor.connect():
         return
         
+    # --- CALCULATE SERVER TIME OFFSET ---
+    # Ensures we are synced with Broker's clock for News & Candles
+    server_time_offset = 0
+    try:
+        symbol_info = mt5.symbol_info_tick(config.SYMBOL)
+        if symbol_info:
+            server_time = symbol_info.time
+            local_time = int(time.time())
+            server_time_offset = round((server_time - local_time) / 3600)
+            logging.info(f"🕒 Server Time Offset: {server_time_offset} hours")
+    except Exception as e:
+        logging.warning(f"Failed to calculate time offset: {e}")
+
     logic = TradingLogic(executor)
     news_manager = NewsManager() # Initialize once
     last_candle_time = None
@@ -114,18 +127,31 @@ def main():
             logging.info("="*40)
             if config.LOT_SIZE < sym.volume_min:
                 logging.warning(f"⚠️ Warning: LOT_SIZE {config.LOT_SIZE} is less than Min Lot {sym.volume_min}!")
-    except: pass
-    
+    except Exception as e:
+        logging.debug(f"Startup report error: {e}")
+
     while True:
         try:
-            # 0. Auto-Reconnect logic
-            if not executor.is_connected():
-                logging.warning("⚠️ MT5 Disconnected! Re-initializing...")
-                if executor.connect():
-                    logging.info("✅ Re-connected to MT5.")
-                else:
-                    time.sleep(5)
+            # 0. Auto-Reconnect logic (Enhanced)
+            terminal_info = mt5.terminal_info()
+            if terminal_info is None or not terminal_info.connected:
+
+                logging.warning("⚠️ Connection lost, attempting to reconnect...")
+                reconnect_attempts = 0
+                while reconnect_attempts < 5:
+                    if executor.connect():
+                        logging.info("✅ Rebalanced & Reconnected successfully")
+                        break
+                    reconnect_attempts += 1
+                    wait_time = min(pow(2, reconnect_attempts), 30)
+                    logging.info(f"Retry {reconnect_attempts} in {wait_time}s...")
+                    time.sleep(wait_time)
+                
+                if not mt5.terminal_info().connected:
+                    logging.error("Failed to recover. Waiting 60s...")
+                    time.sleep(60)
                     continue
+
 
             # --- DAILY LOSS LIMIT ---
             daily_pnl = get_daily_pnl()

@@ -48,11 +48,12 @@ def export_trade_history(days=365):
         if deals:
             data = []
             for deal in deals:
-                # Filter by symbol type and Entry OUT
-                if deal.symbol == Config.SYMBOL and deal.entry == mt5.DEAL_ENTRY_OUT:
+                # Filter Entry OUT (Closing deals) - Get ALL symbols
+                if deal.entry == mt5.DEAL_ENTRY_OUT:
                     data.append({
                         'time': datetime.fromtimestamp(deal.time),
                         'ticket': deal.ticket,
+                        'symbol': deal.symbol, # 🌟 NEW: Track Symbol
                         'type': "BUY" if deal.type == 0 else "SELL",
                         'volume': deal.volume,
                         'price': deal.price,
@@ -61,6 +62,7 @@ def export_trade_history(days=365):
                         'profit': deal.profit,
                         'comment': deal.comment
                     })
+
             
             df = pd.DataFrame(data)
             
