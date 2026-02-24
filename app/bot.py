@@ -9,6 +9,12 @@ import sys
 import shutil
 import requests
 
+# Missing constants in some MT5 versions
+SYMBOL_FILLING_FOK = 1
+SYMBOL_FILLING_IOC = 2
+SYMBOL_FILLING_RETURN = 4
+
+
 # Ensure project root is in path
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # Redundant if running from root
 
@@ -458,9 +464,9 @@ class XAUUSDBot:
                 
                 max_risk = self.get_setting('MAX_SL_POINTS') * point
                 if risk > max_risk:
-                    if custom_sl == 0: 
-                        sl = price - max_risk
-                        risk = max_risk 
+                    # ✅ ENFORCE GLOBAL CAP (Rule: Never exceed MAX_SL_POINTS)
+                    sl = price - max_risk
+                    risk = max_risk 
 
                 tp = price + (risk * Config.RISK_REWARD_RATIO)
                 
@@ -498,9 +504,9 @@ class XAUUSDBot:
                     
                 max_risk = self.get_setting('MAX_SL_POINTS') * point
                 if risk > max_risk:
-                     if custom_sl == 0:
-                        sl = price + max_risk
-                        risk = max_risk
+                     # ✅ ENFORCE GLOBAL CAP
+                     sl = price + max_risk
+                     risk = max_risk
 
                 tp = price - (risk * Config.RISK_REWARD_RATIO)
             
@@ -514,7 +520,16 @@ class XAUUSDBot:
 
             action = mt5.TRADE_ACTION_DEAL
             type_time = mt5.ORDER_TIME_GTC
-            type_filling = mt5.ORDER_FILLING_IOC 
+            
+            # --- DYNAMIC FILLING MODE ---
+            filling_mode = symbol_info.filling_mode
+            if filling_mode & SYMBOL_FILLING_IOC:
+                type_filling = mt5.ORDER_FILLING_IOC
+            elif filling_mode & SYMBOL_FILLING_FOK:
+                type_filling = mt5.ORDER_FILLING_FOK
+            else:
+                type_filling = mt5.ORDER_FILLING_RETURN
+
             
             request = {
                 "action": action,

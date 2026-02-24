@@ -218,6 +218,17 @@ class Indicators:
         except Exception as e:
             logging.error(f"Swing High/Low Error: {e}")
             return None, None
+
+    @staticmethod
+    def get_swing_low(df, lookback):
+        """Gets the lowest low in the lookback period (Tail)"""
+        return df['low'].tail(lookback).min()
+
+    @staticmethod
+    def get_swing_high(df, lookback):
+        """Gets the highest high in the lookback period (Tail)"""
+        return df['high'].tail(lookback).max()
+
             
     @staticmethod
     def calculate_fibonacci_levels(high, low, trend="UP"):

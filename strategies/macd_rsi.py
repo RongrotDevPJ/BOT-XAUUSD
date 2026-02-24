@@ -38,8 +38,9 @@ class MACDRSIStrategy(BaseStrategy):
         
         # --- NEW: Multi-Timeframe (MTF) Trend ---
         mtf_trend = self.bot.get_mtf_trend() 
-        buy_mtf_ok = (mtf_trend in ["UP", "READY"])
-        sell_mtf_ok = (mtf_trend in ["DOWN", "READY"])
+        buy_mtf_ok = (mtf_trend in ["UP", "READY", "Unknown"])
+        sell_mtf_ok = (mtf_trend in ["DOWN", "READY", "Unknown"])
+
 
         is_trading_time = Config.TRADING_START_HOUR <= current_hour <= Config.TRADING_END_HOUR
         

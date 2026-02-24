@@ -23,8 +23,11 @@ RSI_OVERBOUGHT = 70
 # --- Risk Management ---
 LOT_SIZE = 0.01             # Fixed lot for small account ($16)
 STOP_LOSS_POINTS = 500      # 🛡️ FXIED SL points (e.g., $5.00 if 0.01 lot)
+MAX_SL_POINTS = 1000        # ⚠️ Hard Cap for SL (Adjusted for BTC volatility)
+RISK_REWARD_RATIO = 2.5     # 🏆 THE GOLDEN RULE
 USE_SWING_LOW_SL = False    # Set to False to use fixed SL for $16 account
 SWING_LOOKBACK = 10         
+
 
 # --- Protection (BE & TS) ---
 ENABLE_BREAK_EVEN = True    

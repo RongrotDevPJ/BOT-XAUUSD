@@ -47,6 +47,8 @@ class MT5Executor:
         else:
             self.filling_type = mt5.ORDER_FILLING_RETURN
 
+
+
         if not symbol_info.visible:
             if not mt5.symbol_select(config.SYMBOL, True):
                 logging.error(f"symbol_select({config.SYMBOL}) failed")

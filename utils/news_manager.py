@@ -39,23 +39,28 @@ class NewsManager:
         if not self.news_events:
             self.fetch_news()
             
-        now = datetime.now()
+        # Use UTC for all comparisons to prevent timezone issues
+        now_utc = datetime.utcnow()
+        
         for event in self.news_events:
             try:
-                # API usually provides time in UTC or specific format. 
-                # Assuming simple ISO format for this example.
                 event_time_str = event.get('date') # e.g., "2026-02-21T13:00:00-05:00"
-                # This part needs careful parsing depending on the actual API format.
-                # Here we'll just simulate the check.
                 if event_time_str:
-                    # Basic parsing (ignoring offset for simplicity in example)
+                    # Parse ISO format with offset support
+                    # Replace Z with +00:00 for fromisoformat compatibility in Python 3.7+
                     event_dt = datetime.fromisoformat(event_time_str.replace('Z', '+00:00'))
-                    # Remove timezone info for comparison if needed
-                    event_dt = event_dt.replace(tzinfo=None) 
                     
-                    diff = abs((now - event_dt).total_seconds() / 60)
+                    # Convert event time to UTC (naive) for comparison
+                    if event_dt.tzinfo is not None:
+                        event_dt_utc = event_dt.astimezone(timedelta(0)).replace(tzinfo=None)
+                    else:
+                        event_dt_utc = event_dt
+                    
+                    diff = abs((now_utc - event_dt_utc).total_seconds() / 60)
                     if diff <= avoid_minutes:
                         return True, event.get('title')
-            except:
+            except Exception as e:
+                logging.debug(f"Error parsing news time {event.get('date')}: {e}")
                 continue
         return False, None
+

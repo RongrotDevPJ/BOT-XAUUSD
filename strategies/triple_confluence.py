@@ -62,17 +62,27 @@ class TripleConfluenceStrategy(BaseStrategy):
         if not is_trading_time:
              return "SLEEP", f"💤 Sleeping (Time) | Server Time: {server_time.strftime('%H:%M')}", extra_data
 
+        # --- NEW: Multi-Timeframe (MTF) Trend Filter ---
+        mtf_trend = self.bot.get_mtf_trend()
+        buy_mtf_ok = (mtf_trend in ["UP", "READY", "Unknown"])
+        sell_mtf_ok = (mtf_trend in ["DOWN", "READY", "Unknown"])
+
         # --- ENTRY SIGNAL ---
-        # ต้องครบ 3 เงื่อนไขเท่านั้น
+        # ต้องครบ 3 เงื่อนไขหลัก + MTF Filter
         if is_uptrend and touched_lower and is_oversold:
-            status_detail = f"🚀 BUY | TRPL | Up + BB Low | RSI:{rsi:.1f}"
-            if not self.bot.check_open_positions():
+            if not buy_mtf_ok:
+                status_detail = f"WAIT [TRPL | Up + BB Low | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
+            elif not self.bot.check_open_positions():
                 signal = "BUY"
+                status_detail = f"🚀 BUY | TRPL | Up + BB Low | RSI:{rsi:.1f} | MTF:OK"
                 
         elif is_downtrend and touched_upper and is_overbought:
-             status_detail = f"📉 SELL | TRPL | Down + BB Up | RSI:{rsi:.1f}"
-             if not self.bot.check_open_positions():
+             if not sell_mtf_ok:
+                 status_detail = f"WAIT [TRPL | Down + BB Up | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
+             elif not self.bot.check_open_positions():
                 signal = "SELL"
+                status_detail = f"📉 SELL | TRPL | Down + BB Up | RSI:{rsi:.1f} | MTF:OK"
+
         else:
             # Status for monitoring
             trend_str = "UP" if is_uptrend else ("DOWN" if is_downtrend else "FLAT")

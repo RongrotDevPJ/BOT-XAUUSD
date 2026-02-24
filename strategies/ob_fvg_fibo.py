@@ -60,8 +60,11 @@ class OBFVGFiboStrategy(BaseStrategy):
         if high and low and high != low:
              fibo_levels = Indicators.calculate_fibonacci_levels(high, low, trend_dir)
              mid_point = (high + low) / 2
-             is_discount = price < mid_point
-             is_premium = price > mid_point
+             
+             # ✅ 5% BUFFER for deeper retracements
+             buffer = (high - low) * 0.05
+             is_discount = price < (mid_point - buffer)
+             is_premium = price > (mid_point + buffer)
         
         signal = "WAIT"
         status_detail = "WAIT"
@@ -75,21 +78,16 @@ class OBFVGFiboStrategy(BaseStrategy):
         # Note: bull_ob/bear_ob are already filtered for MITIGATION in Indicators.py now.
         
         # --- Dynamic TP Targets (Liquidity Pools) ---
-        # Buy Target = Recent Swing High
-        # Sell Target = Recent Swing Low
         tp_target = 0.0
-        
         if Config.ENABLE_DYNAMIC_TP_SMC:
             if trend_dir == "UP":
-                 # Find nearest Swing High above price
                  recent_highs = [s['price'] for s in swings if s['type'] == 'HIGH' and s['price'] > price]
-                 if recent_highs: tp_target = min(recent_highs) # Nearest Liquidity
-                 else: tp_target = high # Fallback to Range High
+                 if recent_highs: tp_target = min(recent_highs)
+                 else: tp_target = high
             else:
-                 # Find nearest Swing Low below price
                  recent_lows = [s['price'] for s in swings if s['type'] == 'LOW' and s['price'] < price]
-                 if recent_lows: tp_target = max(recent_lows) # Nearest Liquidity
-                 else: tp_target = low # Fallback to Range Low
+                 if recent_lows: tp_target = max(recent_lows)
+                 else: tp_target = low
 
         # --- BUY LOGIC ---
         if bull_ob:
@@ -112,7 +110,6 @@ class OBFVGFiboStrategy(BaseStrategy):
             if l786 <= price <= (l618 + atr*0.2):
                 is_fibo_match = True
         
-        # Buyer Confirmation
         pattern = Indicators.check_candlestick_pattern(df, index=row_index)
         candlestick_conf = pattern in ["BULLISH_ENGULFING", "BULLISH_PINBAR"]
         smc_conf = has_idm_sweep or (mss == "BULL_MSS")
@@ -129,21 +126,26 @@ class OBFVGFiboStrategy(BaseStrategy):
                   is_golden_zone = is_ob_match and is_fibo_match
                   
                   if (candlestick_conf and smc_conf) or (is_golden_zone and smc_conf):
-                    if not self.bot.check_open_positions():
-                        signal = "BUY"
-                        if is_golden_zone and not candlestick_conf:
-                            why = "Golden Setup"
-                        else:
-                            why = f"{pattern}"
-                        status_detail = f"🚀 BUY | SMC | {why} | R:{rsi:.1f} | IDM/MSS Sync"
-                        
-                        # SL
+                        # SL Calculation
                         if bull_ob: calculated_sl = bull_ob[1] - (atr * 0.5)
                         else: calculated_sl = price - (atr * 2)
+
+                        # ✅ STRUCTURAL SL CHECK (Rule: Skip if structural SL > 500 points)
+                        point = 0.01 # Gold standard point
+                        sl_dist_pts = (price - calculated_sl) / point
                         
-                        # TP
-                        calculated_tp = tp_target if tp_target > 0 else (price + (price - calculated_sl) * Config.RISK_REWARD_RATIO)
-                        
+                        # ✅ ACTIVATE MTF FILTER
+                        if mtf_trend not in ["READY", "Unknown", trend_dir]:
+                            status_detail = f"WAIT [{match_type} in Discount | Filtered by MTF: {mtf_trend} ❌]"
+                        elif sl_dist_pts > 500:
+                            status_detail = f"WAIT [{match_type} in Discount | SL too far: {sl_dist_pts:.0f} pts ❌]"
+                        else:
+                            if not self.bot.check_open_positions():
+                                signal = "BUY"
+                                why = "Golden Setup" if (is_golden_zone and not candlestick_conf) else f"{pattern}"
+                                status_detail = f"🚀 BUY | SMC | {why} | R:{rsi:.1f} | IDM/MSS Sync"
+                                # TP Calculation (Strict RR 1:2.5)
+                                calculated_tp = price + (price - calculated_sl) * Config.RISK_REWARD_RATIO
                   else:
                     missing = []
                     if not candlestick_conf: missing.append("Candle")
@@ -152,15 +154,11 @@ class OBFVGFiboStrategy(BaseStrategy):
              else:
                  status_detail = f"WAIT [{match_type} but in PREMIUM Zone ❌]"
 
-         # --- SELL LOGIC ---
+        # --- SELL LOGIC ---
         is_sell_ob = False
         is_sell_fvg_match = False
         is_sell_fibo = False
         
-        # Initialize variables for SELL logic to prevent UnboundLocalError
-        calculated_sl = 0.0
-        calculated_tp = 0.0
-
         if bear_ob:
             ob_high, ob_low = bear_ob
             resistance_valid = price <= (ob_high + atr*0.1)
@@ -190,23 +188,27 @@ class OBFVGFiboStrategy(BaseStrategy):
 
              if is_premium:
                  is_golden_zone = is_sell_ob and is_sell_fibo
-                 
                  if (candlestick_conf and smc_conf) or (is_golden_zone and smc_conf):
-                      if not self.bot.check_open_positions():
-                        signal = "SELL"
-                        if is_golden_zone and not candlestick_conf:
-                            why = "Golden Setup"
-                        else:
-                            why = f"{pattern}"
-                        status_detail = f"📉 SELL | SMC | {why} | R:{rsi:.1f} | IDM/MSS Sync"
-                        
+                        # SL Calculation
                         if bear_ob: calculated_sl = bear_ob[0] + (atr * 0.5)
                         else: calculated_sl = price + (atr * 2)
-                        
-                        # Fix TP Calculation: Ensure positive distance
-                        sl_dist = abs(calculated_sl - price)
-                        calculated_tp = tp_target if tp_target > 0 else (price - (sl_dist * Config.RISK_REWARD_RATIO))
 
+                        # ✅ STRUCTURAL SL CHECK
+                        point = 0.01
+                        sl_dist_pts = (calculated_sl - price) / point
+                        
+                        # ✅ ACTIVATE MTF FILTER
+                        if mtf_trend not in ["READY", "Unknown", trend_dir]:
+                            status_detail = f"WAIT [{match_type} in Premium | Filtered by MTF: {mtf_trend} ❌]"
+                        elif sl_dist_pts > 500:
+                            status_detail = f"WAIT [{match_type} in Premium | SL too far: {sl_dist_pts:.0f} pts ❌]"
+                        else:
+                            if not self.bot.check_open_positions():
+                                signal = "SELL"
+                                why = "Golden Setup" if (is_golden_zone and not candlestick_conf) else f"{pattern}"
+                                status_detail = f"📉 SELL | SMC | {why} | R:{rsi:.1f} | IDM/MSS Sync"
+                                # TP Calculation (Strict RR 1:2.5)
+                                calculated_tp = price - (abs(calculated_sl - price) * Config.RISK_REWARD_RATIO)
                  else:
                     missing = []
                     if not candlestick_conf: missing.append("Candle")
@@ -224,12 +226,13 @@ class OBFVGFiboStrategy(BaseStrategy):
             )
 
         extra_data = {
-           "price": price,
+            "price": price,
             "atr": atr,
             "fibo_levels": fibo_levels,
             "active_rsi_threshold": 50,
-            "custom_sl": calculated_sl if 'calculated_sl' in locals() else 0.0,
-            "custom_tp": calculated_tp if 'calculated_tp' in locals() else 0.0
+            "custom_sl": calculated_sl,
+            "custom_tp": calculated_tp
         }
             
         return signal, status_detail, extra_data
+

@@ -6,13 +6,18 @@ from datetime import datetime
 import MetaTrader5 as mt5
 from .execution import MT5Executor
 from .logic import TradingLogic
-from .indicators import IndicatorCalculator
+from utils.indicators import Indicators
+
 from . import config
+from utils.news_manager import NewsManager
+
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s | %(levelname)-8s | %(message)s',
+    datefmt='%H:%M:%S'
 )
+
 
 def send_notification(message):
     """Sends notification via Telegram and Line Notify"""
@@ -37,13 +42,30 @@ def send_notification(message):
 def save_trade_log(ticket, type, price, rsi, ema):
     """Saves trade entry details to CSV for analysis"""
     try:
-        file_path = "btc_trade_log.csv"
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+            
+        file_path = os.path.join(data_dir, 'btc_trade_history.csv')
         file_exists = os.path.isfile(file_path)
-        with open(file_path, mode='a', newline='') as file:
+        with open(file_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             if not file_exists:
-                writer.writerow(['Time', 'Ticket', 'Type', 'Price', 'RSI', 'EMA200'])
-            writer.writerow([datetime.now().strftime('%Y-%m-%d %H:%M:%S'), ticket, type, price, rsi, ema])
+                writer.writerow(['Time', 'Ticket', 'Strategy', 'Type', 'Volume', 'Price', 'Profit', 'Comment', 'Status'])
+            
+            # Format to match main bot schema as much as possible for dashboard analytics
+            writer.writerow([
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+                ticket, 
+                "BTC_RSI_EMA", 
+                type, 
+                config.LOT_SIZE, 
+                price, 
+                "0.00", # Still open, profit unknown
+                f"RSI:{rsi:.1f} EMA:{ema:.1f}", 
+                "🚀 ENTRY"
+            ])
+
     except PermissionError:
         logging.error(f"❌ Cannot save log: {file_path} is open in another program (Excel?).")
     except Exception as e:
@@ -72,7 +94,9 @@ def main():
         return
         
     logic = TradingLogic(executor)
+    news_manager = NewsManager() # Initialize once
     last_candle_time = None
+
     iteration_count = 0
     last_heartbeat_time = 0 # Unix timestamp
 
@@ -128,7 +152,14 @@ def main():
                 continue
                 
             # 2. Calculate Indicators
-            df = IndicatorCalculator.add_indicators(df)
+            df['close'] = pd.to_numeric(df['close'])
+            df['high'] = pd.to_numeric(df['high'])
+            df['low'] = pd.to_numeric(df['low'])
+            
+            df['ema_trend'] = Indicators.calculate_ema(df['close'], config.EMA_TREND_PERIOD)
+            df['ema_exit'] = Indicators.calculate_ema(df['close'], config.EMA_EXIT_PERIOD)
+            df['rsi'] = Indicators.calculate_rsi(df['close'], config.RSI_PERIOD)
+
             
             # --- FETCH CURRENT TICK ---
             tick = mt5.symbol_info_tick(config.SYMBOL)
@@ -164,17 +195,23 @@ def main():
             # 4. Signal Logic & Execution
             signal = logic.check_signal(df)
             
+            # --- NEWS FILTER CHECK ---
+            is_news, news_title = news_manager.is_news_time(avoid_minutes=30)
+
+            
             # Use Tick Prices for execution
             is_new_candle = (current_candle_time > last_candle_time) if last_candle_time else True
 
             if signal and not in_position:
-                if config.WAIT_FOR_CANDLE_CLOSE and not is_new_candle:
+                if is_news:
+                    logging.warning(f"⚠️ Skipping trade due to HIGH IMPACT NEWS: {news_title}")
+                elif config.WAIT_FOR_CANDLE_CLOSE and not is_new_candle:
                     # Waiting for current candle to finish
                     pass
                 else:
                     order_type = mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL
                     price_exec = tick.ask if signal == 'buy' else tick.bid
-                    sl_price = logic.get_stop_loss(df, signal, price_exec)
+                    sl_price, tp_price = logic.get_sl_tp(df, signal, price_exec)
                     
                     # --- MARGIN CHECK ---
                     can_trade, reason = executor.check_margin(config.SYMBOL, order_type, config.LOT_SIZE, price_exec)
@@ -186,7 +223,7 @@ def main():
                         # Sleep for a bit to avoid terminal spamming
                         time.sleep(300)
                         continue
-
+ 
                     # --- SPREAD FILTER ---
                     spread = (tick.ask - tick.bid) / mt5.symbol_info(config.SYMBOL).point
                     if spread > config.MAX_SPREAD_POINTS:
@@ -194,12 +231,13 @@ def main():
                         continue
 
                     side_str = "BUY" if signal == 'buy' else "SELL"
-                    logging.info(f"🟢 Signal {side_str} | Price: {price_exec} | SL: {sl_price} | Spread: {spread}")
-                    res = executor.create_order(config.SYMBOL, order_type, config.LOT_SIZE, price_exec, sl=sl_price)
+                    logging.info(f"🟢 Signal {side_str} | Price: {price_exec} | SL: {sl_price} | TP: {tp_price} | News: {news_title}")
+                    res = executor.create_order(config.SYMBOL, order_type, config.LOT_SIZE, price_exec, sl=sl_price, tp=tp_price)
                     if res:
                         last_candle_time = current_candle_time 
                         save_trade_log(res.order, side_str, price_exec, last_row['rsi'], last_row['ema_trend'])
-                        send_notification(f"✅ {side_str} BTC SUCCESS\nPrice: {price_exec}\nSL: {sl_price}")
+                        send_notification(f"✅ {side_str} BTC SUCCESS\nPrice: {price_exec}\nSL: {sl_price}\nTP: {tp_price}")
+
             
             elif in_position:
                 for pos in active_positions:
@@ -255,12 +293,20 @@ def main():
                         logging.info(f"🔴 Signal EXIT for Ticket {pos.ticket} | Closing Position...")
                         res = executor.close_position(pos)
                         if res:
+                            # Log the CLOSED deal for stats
+                            acc_info = mt5.account_info()
+                            balance_after = acc_info.balance if acc_info else 0
+                            # Note: In a real scenario, we'd fetch the deal profit from history. 
+                            # For now, let's just log the exit price.
+                            save_trade_log(pos.ticket, "EXIT", tick.bid, last_row['rsi'], last_row['ema_trend'])
                             send_notification(f"✅ EXIT SUCCESS (Ticket {pos.ticket})\nPrice: {price}")
+
 
             # Heartbeat Logging (every 1 minute / 6 iterations)
             if iteration_count % 6 == 0:
-                logging.info(f"💓 Heartbeat | RSI: {last_row['rsi']:.2f} | EMA200: {last_row['ema_trend']:.2f} | Price: {tick.bid}")
+                logging.info(f"💓 Heartbeat | RSI: {last_row['rsi']:.1f} | EMA200: {last_row['ema_trend']:.1f} | Price: {tick.bid:.2f}")
             iteration_count += 1
+
 
             time.sleep(10) # Check every 10 seconds
             

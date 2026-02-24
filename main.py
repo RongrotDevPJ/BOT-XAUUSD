@@ -26,8 +26,9 @@ if __name__ == "__main__":
     logging.basicConfig(
         filename=log_filename, 
         level=logging.INFO, 
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
+        format='%(asctime)s | %(levelname)-8s | %(message)s',
+        datefmt='%H:%M:%S',
+
         force=True, # Force reconfiguration
         encoding='utf-8' # 🔧 FIX: Force UTF-8 for emojis
     )
@@ -38,8 +39,9 @@ if __name__ == "__main__":
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s | %(levelname)-8s | %(message)s', datefmt='%H:%M:%S')
     console_handler.setFormatter(formatter)
+
     logging.getLogger().addHandler(console_handler)
     
     try:
