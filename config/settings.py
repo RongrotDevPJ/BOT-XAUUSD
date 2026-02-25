@@ -54,7 +54,7 @@ class Config:
     NEWS_AVOID_MINUTES = 30      # Avoid trading 30 mins before/after news
     
     # --- Auto Risk Management (ATR Based) ---
-    ENABLE_AUTO_RISK = False    # ❌ Disable ATR SL (Use Fixed 500pts)
+    ENABLE_AUTO_RISK = True     # ✅ Enabled ATR SL (More dynamic)
     ATR_SL_MULT = 1.2           # 🔧 M5: ลด Buffer เหลือ 1.2 (กันสะบัดน้อยลง)
     ATR_TP_MULT = 2.4           # TP = Price +/- (ATR * 2.4) (Risk:Reward 1:2)
 
@@ -67,23 +67,20 @@ class Config:
     MAX_SL_POINTS = 500         # 🛡️ M5: จำกัด Max SL 500 จุด (ถ้าเกินไม่เล่น)
 
     # =========================================
-    # 🛡️ 4. SETTINGS: TRAILING STOP (ล็อกกำไร)
+    # 🛡️ 4. SETTINGS: PROFIT PROTECTION (ล็อกกำไร)
     # =========================================
-    TRAILING_STOP_TRIGGER = 500 # 🔧 M5: ขยับกว้างขึ้นเป็น 500 จุด เพื่อให้ทนถือกำไรได้นานขึ้น
-    TRAILING_STOP_LOCK = 150    # ล็อคกำไรเพิ่มขึ้นเป็น 150 จุด
-    TRAILING_STOP_STEP = 50     # 🚀 ขยับทีละ 50 จุด
-
-    
-    # --- Break Even (BE) Logic ---
+    # Stage 1: Break Even (40% of TP)
     ENABLE_BREAK_EVEN = True    # เปิดใช้ระบบขยับ SL บังทุน
     BREAK_EVEN_PERCENT = 0.4    # 🎯 บังทุนเมื่อกำไรถึง 40% ของระยะ TP
-    BREAK_EVEN_LOCK = 20        # ล็อคกำไรขั้นต่ำ 20 จุด
+    BREAK_EVEN_LOCK = 100       # ล็อคกำไรที่ 100 จุด (Entry + 100)
+
+    # Stage 2: Profit Lock (65% of TP)
+    ENABLE_PROFIT_LOCK = True   # เปิดใช้ระบบล็อคกำไร 50%
+    PROFIT_LOCK_PERCENT = 0.65  # 🎯 ล็อคกำไรเมื่อกำไรถึง 65% ของระยะ TP
+    PROFIT_LOCK_LEVEL = 0.5     # ขยับ SL มาที่ 50% ของระยะ TP
 
     
-    # --- Dynamic TP Extension (TP1 -> TP2) ---
-    ENABLE_DYNAMIC_TP = False   # 🚀 ปิดระบบขยาย TP (ใช้ RR 1:2 แบบคงที่ตามใจผู้ใช้)
-    TP_EXTENSION_TRIGGER = 50   # จุดเหลือถึง TP เริ่มขยับ
-    TP_EXTENSION_DISTANCE = 500 # ขยับ TP หนีไปอีก 500 จุด
+    # (Legacy Trailing and Dynamic TP Removed)
 
     # --- NEW: Partial Take Profit (แบ่งปิดกำไร) ---
     ENABLE_PARTIAL_TP = True    # ✅ Enable Partial TP (0.10 -> Close 0.05)

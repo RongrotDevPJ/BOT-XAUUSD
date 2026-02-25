@@ -118,8 +118,8 @@ class MT5Executor:
         
         return None
 
-    def close_position(self, position):
-        """Closes a specific MT5 position"""
+    def close_position(self, position, volume=None):
+        """Closes a specific MT5 position (supports partial close)"""
         tick = mt5.symbol_info_tick(position.symbol)
         if tick is None:
             logging.error(f"Failed to get tick for closing {position.ticket}")
@@ -128,16 +128,19 @@ class MT5Executor:
         order_type = mt5.ORDER_TYPE_SELL if position.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
         price = tick.bid if order_type == mt5.ORDER_TYPE_SELL else tick.ask
         
+        # Determine volume to close
+        close_vol = volume if volume is not None else position.volume
+        
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": position.symbol,
-            "volume": position.volume,
+            "volume": float(close_vol),
             "type": order_type,
             "position": position.ticket,
             "price": price,
             "deviation": config.DEVIATION,
             "magic": config.MAGIC_NUMBER,
-            "comment": "Close Position",
+            "comment": "Partial Close" if volume else "Close Position",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": self.filling_type,
         }

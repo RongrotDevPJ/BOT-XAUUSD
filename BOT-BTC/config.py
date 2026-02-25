@@ -22,21 +22,26 @@ RSI_OVERBOUGHT = 70
 
 # --- Risk Management ---
 LOT_SIZE = 0.01             # Fixed lot for small account ($16)
-STOP_LOSS_POINTS = 500      # 🛡️ FXIED SL points (e.g., $5.00 if 0.01 lot)
-MAX_SL_POINTS = 1000        # ⚠️ Hard Cap for SL (Adjusted for BTC volatility)
+STOP_LOSS_POINTS = 2500     # 🛡️ Adjusted for BTC Volatility (Increased from 500)
+MAX_SL_POINTS = 3000        # ⚠️ Hard Cap for SL
 RISK_REWARD_RATIO = 2.5     # 🏆 THE GOLDEN RULE
 USE_SWING_LOW_SL = False    # Set to False to use fixed SL for $16 account
 SWING_LOOKBACK = 10         
 
+# --- Partial Take Profit (NEW) ---
+ENABLE_PARTIAL_TP = True    # ✅ Enable Partial TP
+PARTIAL_TP_RR = 1.0         # 🎯 Close 50% at RR 1:1
+PARTIAL_TP_RATIO = 0.5      
 
-# --- Protection (BE & TS) ---
+
+# --- Protection (BE & Profit Lock) ---
 ENABLE_BREAK_EVEN = True    
-BE_TRIGGER_POINTS = 300     # Move SL to BE when profit reaches 300 points
-BE_LOCK_POINTS = 50         # Lock 50 points profit
+BE_PERCENT = 0.4            # Move SL to BE when profit reaches 40% of TP
+BE_LOCK_POINTS = 100        # Lock 100 points profit
 
-ENABLE_TRAILING_STOP = True
-TS_TRIGGER_POINTS = 500     # Start trailing after 500 points profit
-TS_STEP_POINTS = 100        # Move SL every 100 points profit
+ENABLE_PROFIT_LOCK = True
+PROFIT_LOCK_PERCENT = 0.65  # Lock 50% profit when profit reaches 65% of TP
+PROFIT_LOCK_LEVEL = 0.5     
 
 DAILY_LOSS_LIMIT = 2.0      # 🛑 Stop trading if lost more than $2 today
 HEARTBEAT_HOURS = 1         # 💓 Send status report every 1 hour

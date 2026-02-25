@@ -41,37 +41,120 @@ def send_notification(message):
         except Exception as e:
             logging.error(f"Line Notify failed: {e}")
 
-def save_trade_log(ticket, type, price, rsi, ema):
+def save_entry_log(ticket, type, price, rsi, ema):
     """Saves trade entry details to CSV for analysis"""
     try:
         data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
             
-        file_path = os.path.join(data_dir, 'btc_trade_history.csv')
+        file_path = os.path.join(data_dir, 'entry_log.csv')
         file_exists = os.path.isfile(file_path)
-        with open(file_path, mode='a', newline='', encoding='utf-8') as file:
+        with open(file_path, mode='a', newline='', encoding='utf-8-sig') as file:
             writer = csv.writer(file)
             if not file_exists:
-                writer.writerow(['Time', 'Ticket', 'Strategy', 'Type', 'Volume', 'Price', 'Profit', 'Comment', 'Status'])
+                writer.writerow(['Time', 'Ticket', 'Strategy', 'Type', 'Price', 'Reason', 'Indicators'])
             
-            # Format to match main bot schema as much as possible for dashboard analytics
             writer.writerow([
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
                 ticket, 
                 "BTC_RSI_EMA", 
                 type, 
-                config.LOT_SIZE, 
                 price, 
-                "0.00", # Still open, profit unknown
-                f"RSI:{rsi:.1f} EMA:{ema:.1f}", 
-                "🚀 ENTRY"
+                "Signal Confirmed", 
+                f"RSI:{rsi:.1f} EMA:{ema:.1f}"
             ])
 
-    except PermissionError:
-        logging.error(f"❌ Cannot save log: {file_path} is open in another program (Excel?).")
     except Exception as e:
-        logging.error(f"Error saving log: {e}")
+        logging.error(f"Error saving entry log: {e}")
+
+def sync_trade_history():
+    """Syncs BTC closed trades from MT5 history to the main unified CSV"""
+    try:
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        # Look back 30 days
+        today_start = datetime(now.year, now.month, now.day) - timedelta(days=30)
+        deals = mt5.history_deals_get(today_start, now + timedelta(hours=1))
+        
+        if not deals:
+            return
+
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+
+        filename = os.path.join(data_dir, 'trade_history.csv')
+        file_exists = os.path.isfile(filename)
+        existing_tickets = set()
+
+        if file_exists:
+            try:
+                with open(filename, mode='r', encoding='utf-8') as r_file:
+                    reader = csv.reader(r_file)
+                    next(reader, None) 
+                    for row in reader:
+                        if row and len(row) > 1:
+                            try:
+                                existing_tickets.add(int(row[1]))
+                            except ValueError:
+                                continue
+            except Exception as e:
+                logging.error(f"Read CSV Error: {e}")
+
+        new_deals = []
+        for deal in deals:
+            if deal.symbol == config.SYMBOL and deal.entry == mt5.DEAL_ENTRY_OUT and deal.ticket not in existing_tickets:
+                if deal.magic == config.MAGIC_NUMBER:
+                    new_deals.append(deal)
+
+        if new_deals:
+            with open(filename, mode='a', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                if not file_exists:
+                    writer.writerow(['Time', 'Ticket', 'Strategy', 'Type', 'Volume', 'Price', 'Profit', 'Comment', 'Status'])
+                
+                for deal in new_deals:
+                    deal_time = datetime.fromtimestamp(deal.time).strftime('%Y-%m-%d %H:%M:%S')
+                    deal_type = "BUY" if deal.type == 0 else "SELL"
+                    
+                    status = "UNKNOWN"
+                    if deal.reason == mt5.DEAL_REASON_TP:
+                        status = "TP Hit 🎯"
+                    elif deal.reason == mt5.DEAL_REASON_SL:
+                        if deal.profit >= 0:
+                            status = "Trailing SL/BE 🛡️"
+                        else:
+                            status = "SL Hit 🔴"
+                    elif deal.reason == mt5.DEAL_REASON_CLIENT:
+                        status = "Manual Close 👤"
+                    elif deal.reason == mt5.DEAL_REASON_EXPERT:
+                        status = "Bot Close 🤖"
+
+                    total_profit = deal.profit + deal.swap + deal.commission
+                    send_notification(
+                        f"🏁 BTC ORDER CLOSED\n"
+                        f"Ticket: {deal.ticket}\n"
+                        f"Type: {deal_type}\n"
+                        f"Profit: ${total_profit:.2f}\n"
+                        f"Status: {status}"
+                    )
+                    
+                    writer.writerow([
+                        deal_time, 
+                        deal.ticket, 
+                        "BTC_RSI_EMA", 
+                        deal_type, 
+                        deal.volume, 
+                        deal.price, 
+                        round(total_profit, 2), 
+                        deal.comment,
+                        status
+                    ])
+                    logging.info(f"📝 History Synced: BTC Ticket {deal.ticket} ({status}) | P/L: ${total_profit:.2f}")
+
+    except Exception as e:
+        logging.error(f"Sync History Error: {e}")
 
 def get_daily_pnl():
     """Calculates total profit/loss for today from closed deals"""
@@ -263,7 +346,7 @@ def main():
                     res = executor.create_order(config.SYMBOL, order_type, config.LOT_SIZE, price_exec, sl=sl_price, tp=tp_price)
                     if res:
                         last_candle_time = current_candle_time 
-                        save_trade_log(res.order, side_str, price_exec, last_row['rsi'], last_row['ema_trend'])
+                        save_entry_log(res.order, side_str, price_exec, last_row['rsi'], last_row['ema_trend'])
                         send_notification(f"✅ {side_str} BTC SUCCESS\nPrice: {price_exec}\nSL: {sl_price}\nTP: {tp_price}")
 
             
@@ -281,31 +364,61 @@ def main():
                         profit_points = (pos.price_open - tick.ask) / point
                     else: continue
                     
-                    # 1. Break Even
-                    if config.ENABLE_BREAK_EVEN and profit_points > config.BE_TRIGGER_POINTS:
-                        if pos.type == mt5.ORDER_TYPE_BUY:
-                            target_be = pos.price_open + (config.BE_LOCK_POINTS * point)
-                            if pos.sl < target_be or pos.sl == 0:
-                                logging.info(f"🛡️ Break Even Triggered (BUY) for {pos.ticket}")
-                                executor.modify_position(pos.ticket, target_be, pos.tp)
-                        elif pos.type == mt5.ORDER_TYPE_SELL:
-                            target_be = pos.price_open - (config.BE_LOCK_POINTS * point)
-                            if pos.sl > target_be or pos.sl == 0:
-                                logging.info(f"🛡️ Break Even Triggered (SELL) for {pos.ticket}")
-                                executor.modify_position(pos.ticket, target_be, pos.tp)
+                    # --- NEW PROFIT PROTECTION LOGIC (2 STAGES) ---
+                    tp_dist_pts = abs(pos.tp - pos.price_open) / point if pos.tp != 0 else config.STOP_LOSS_POINTS * config.RISK_REWARD_RATIO
                     
-                    # 2. Trailing Stop
-                    if config.ENABLE_TRAILING_STOP and profit_points > config.TS_TRIGGER_POINTS:
-                        if pos.type == mt5.ORDER_TYPE_BUY:
-                            new_sl = tick.bid - (config.TS_TRIGGER_POINTS * point)
-                            if pos.sl == 0 or (new_sl - pos.sl) / point > config.TS_STEP_POINTS:
-                                logging.info(f"📈 Trailing Stop moving (BUY) for {pos.ticket}")
-                                executor.modify_position(pos.ticket, new_sl, pos.tp)
-                        elif pos.type == mt5.ORDER_TYPE_SELL:
-                            new_sl = tick.ask + (config.TS_TRIGGER_POINTS * point)
-                            if pos.sl == 0 or (pos.sl - new_sl) / point > config.TS_STEP_POINTS:
-                                logging.info(f"📈 Trailing Stop moving (SELL) for {pos.ticket}")
-                                executor.modify_position(pos.ticket, new_sl, pos.tp)
+                    # Stage 1: Break Even (40% of TP)
+                    if config.ENABLE_BREAK_EVEN:
+                        be_trigger_pts = tp_dist_pts * config.BE_PERCENT
+                        if profit_points >= be_trigger_pts:
+                            target_be = pos.price_open + (config.BE_LOCK_POINTS * point) if pos.type == mt5.ORDER_TYPE_BUY else pos.price_open - (config.BE_LOCK_POINTS * point)
+                            
+                            # Move SL only if it improves the position
+                            if pos.type == mt5.ORDER_TYPE_BUY:
+                                if pos.sl < (target_be - point):
+                                    logging.info(f"🛡️ Stage 1: BE Set (+100) for BTC Ticket {pos.ticket}")
+                                    executor.modify_position(pos.ticket, target_be, pos.tp)
+                            else: # SELL
+                                if pos.sl > (target_be + point) or pos.sl == 0:
+                                    logging.info(f"🛡️ Stage 1: BE Set (+100) for BTC Ticket {pos.ticket}")
+                                    executor.modify_position(pos.ticket, target_be, pos.tp)
+
+                    # Stage 2: Profit Lock (65% of TP)
+                    if config.ENABLE_PROFIT_LOCK:
+                        pl_trigger_pts = tp_dist_pts * config.PROFIT_LOCK_PERCENT
+                        if profit_points >= pl_trigger_pts:
+                            # Target SL is 50% of original TP distance
+                            target_lock = pos.price_open + (tp_dist_pts * config.PROFIT_LOCK_LEVEL * point) if pos.type == mt5.ORDER_TYPE_BUY else pos.price_open - (tp_dist_pts * config.PROFIT_LOCK_LEVEL * point)
+                            
+                            # Move SL only if it improves the position
+                            if pos.type == mt5.ORDER_TYPE_BUY:
+                                if pos.sl < (target_lock - point):
+                                    logging.info(f"🔒 Stage 2: Profit Lock (50%) for BTC Ticket {pos.ticket}")
+                                    executor.modify_position(pos.ticket, target_lock, pos.tp)
+                            else: # SELL
+                                if pos.sl > (target_lock + point) or pos.sl == 0:
+                                    logging.info(f"🔒 Stage 2: Profit Lock (50%) for BTC Ticket {pos.ticket}")
+                                    executor.modify_position(pos.ticket, target_lock, pos.tp)
+
+                    # 3. Partial Take Profit
+                    if config.ENABLE_PARTIAL_TP:
+                        # Calculate risk in points (initial SL distance)
+                        risk_pts = abs(pos.price_open - pos.sl) / point if pos.sl > 0 else config.STOP_LOSS_POINTS
+                        target_pts = risk_pts * config.PARTIAL_TP_RR
+                        
+                        # Only partial close if profit reaches target RR and volume is still original
+                        # (We check comment or volume to ensure we don't partial close multiple times)
+                        if profit_points >= target_pts and pos.volume >= config.LOT_SIZE:
+                            # Verify if we can actually split this lot
+                            if pos.volume >= (sym_info.volume_min * 2):
+                                partial_vol = round(pos.volume * config.PARTIAL_TP_RATIO, 2)
+                                logging.info(f"💰 Partial TP Triggered for {pos.ticket} | Closing {partial_vol} lots")
+                                res_p = executor.close_position(pos, volume=partial_vol)
+                                if res_p:
+                                    send_notification(f"💰 PARTIAL TP SUCCESS (Ticket {pos.ticket})\nClosed: {partial_vol}\nRemaining: {pos.volume - partial_vol}")
+                            else:
+                                # Lot too small to split, skip but log once
+                                logging.debug(f"Skip Partial TP for {pos.ticket}: Volume {pos.volume} too small to split.")
 
                     # Exit Condition (Long): RSI Overbought or price below EMA 20
                     # Exit Condition (Short): RSI Oversold or price above EMA 20
@@ -321,16 +434,11 @@ def main():
                         logging.info(f"🔴 Signal EXIT for Ticket {pos.ticket} | Closing Position...")
                         res = executor.close_position(pos)
                         if res:
-                            # Log the CLOSED deal for stats
-                            acc_info = mt5.account_info()
-                            balance_after = acc_info.balance if acc_info else 0
-                            # Note: In a real scenario, we'd fetch the deal profit from history. 
-                            # For now, let's just log the exit price.
-                            save_trade_log(pos.ticket, "EXIT", tick.bid, last_row['rsi'], last_row['ema_trend'])
                             send_notification(f"✅ EXIT SUCCESS (Ticket {pos.ticket})\nPrice: {price}")
 
 
-            # Heartbeat Logging (every 1 minute / 6 iterations)
+            # Sync history and Heartbeat Logging
+            sync_trade_history()
             if iteration_count % 6 == 0:
                 logging.info(f"💓 Heartbeat | RSI: {last_row['rsi']:.1f} | EMA200: {last_row['ema_trend']:.1f} | Price: {tick.bid:.2f}")
             iteration_count += 1

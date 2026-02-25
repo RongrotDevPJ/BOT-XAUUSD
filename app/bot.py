@@ -664,29 +664,52 @@ class XAUUSDBot:
                 tp = pos.tp 
                 point = mt5.symbol_info(self.symbol).point
 
-                # 1. Break Even (BE) Logic
-                if Config.ENABLE_BREAK_EVEN:
-                    # 🎯 Calculate dynamic BE trigger (e.g., 40% of TP distance)
-                    tp_dist_pts = abs(tp - price_open) / point if tp != 0 else Config.BREAK_EVEN_TRIGGER
-                    be_trigger_pts = tp_dist_pts * Config.BREAK_EVEN_PERCENT
-
+                # --- NEW PROFIT PROTECTION LOGIC (2 STAGES) ---
+                if Config.ENABLE_BREAK_EVEN or Config.ENABLE_PROFIT_LOCK:
+                    current_profit_pts = 0
                     if order_type == 0: # BUY
-                        if (price_current - price_open) / point > be_trigger_pts:
-                            target_be = price_open + (Config.BREAK_EVEN_LOCK * point)
-                            if sl < (target_be - point): 
-                                if self.modify_order(ticket, target_be, tp):
-                                    logging.info(f"⚡ Break Even Set! Ticket: {ticket} (Triggered at {be_trigger_pts:.0f} pts)")
-                                    self.send_telegram_message(f"⚡ <b>BREAK EVEN SET</b>\nTicket: <code>{ticket}</code>\nSL moved to: <code>{target_be:.2f}</code>")
-                                continue 
-                                
-                    elif order_type == 1: # SELL
-                        if (price_open - price_current) / point > be_trigger_pts:
-                            target_be = price_open - (Config.BREAK_EVEN_LOCK * point)
-                            if sl > (target_be + point) or sl == 0:
-                                if self.modify_order(ticket, target_be, tp):
-                                    logging.info(f"⚡ Break Even Set! Ticket: {ticket} (Triggered at {be_trigger_pts:.0f} pts)")
-                                    self.send_telegram_message(f"⚡ <b>BREAK EVEN SET</b>\nTicket: <code>{ticket}</code>\nSL moved to: <code>{target_be:.2f}</code>")
-                                continue
+                        current_profit_pts = (price_current - price_open) / point
+                    else: # SELL
+                        current_profit_pts = (price_open - price_current) / point
+
+                    tp_dist_pts = abs(tp - price_open) / point if tp != 0 else Config.TAKE_PROFIT_POINTS
+                    
+                    # Stage 1: Break Even (40% of TP)
+                    if Config.ENABLE_BREAK_EVEN:
+                        be_trigger_pts = tp_dist_pts * Config.BREAK_EVEN_PERCENT
+                        if current_profit_pts >= be_trigger_pts:
+                            target_be = price_open + (Config.BREAK_EVEN_LOCK * point) if order_type == 0 else price_open - (Config.BREAK_EVEN_LOCK * point)
+                            
+                            # Move SL only if it improves the position
+                            if order_type == 0: # BUY
+                                if sl < (target_be - point):
+                                    if self.modify_order(ticket, target_be, tp):
+                                        logging.info(f"🛡️ Stage 1: BE Set (+100) for Ticket {ticket}")
+                                        self.send_telegram_message(f"🛡️ <b>BREAK EVEN SET (40% TP)</b>\nTicket: <code>{ticket}</code>\nSL moved to: <code>{target_be:.2f}</code>")
+                            else: # SELL
+                                if sl > (target_be + point) or sl == 0:
+                                    if self.modify_order(ticket, target_be, tp):
+                                        logging.info(f"🛡️ Stage 1: BE Set (+100) for Ticket {ticket}")
+                                        self.send_telegram_message(f"🛡️ <b>BREAK EVEN SET (40% TP)</b>\nTicket: <code>{ticket}</code>\nSL moved to: <code>{target_be:.2f}</code>")
+
+                    # Stage 2: Profit Lock (65% of TP)
+                    if Config.ENABLE_PROFIT_LOCK:
+                        pl_trigger_pts = tp_dist_pts * Config.PROFIT_LOCK_PERCENT
+                        if current_profit_pts >= pl_trigger_pts:
+                            # Target SL is 50% of original TP distance
+                            target_lock = price_open + (tp_dist_pts * Config.PROFIT_LOCK_LEVEL * point) if order_type == 0 else price_open - (tp_dist_pts * Config.PROFIT_LOCK_LEVEL * point)
+                            
+                            # Move SL only if it improves the position
+                            if order_type == 0: # BUY
+                                if sl < (target_lock - point):
+                                    if self.modify_order(ticket, target_lock, tp):
+                                        logging.info(f"🔒 Stage 2: Profit Lock (50%) for Ticket {ticket}")
+                                        self.send_telegram_message(f"🔒 <b>PROFIT LOCK (65% TP)</b>\nTicket: <code>{ticket}</code>\nSL moved to 50% TP: <code>{target_lock:.2f}</code>")
+                            else: # SELL
+                                if sl > (target_lock + point) or sl == 0:
+                                    if self.modify_order(ticket, target_lock, tp):
+                                        logging.info(f"🔒 Stage 2: Profit Lock (50%) for Ticket {ticket}")
+                                        self.send_telegram_message(f"🔒 <b>PROFIT LOCK (65% TP)</b>\nTicket: <code>{ticket}</code>\nSL moved to 50% TP: <code>{target_lock:.2f}</code>")
 
                 if Config.ENABLE_PARTIAL_TP and ticket not in self.partially_closed_tickets:
                     current_profit_points = 0
@@ -807,8 +830,8 @@ class XAUUSDBot:
         """Saves closed trades to CSV file (Backlog) - Prevents Duplicates"""
         try:
             now = datetime.now() 
-            # Use dynamic offset (look back 1 day with buffer)
-            today_start = datetime(now.year, now.month, now.day) - timedelta(days=1)
+            # Use dynamic offset (look back 30 days to ensure no missing trades after downtime)
+            today_start = datetime(now.year, now.month, now.day) - timedelta(days=30)
             deals = mt5.history_deals_get(today_start, now + timedelta(hours=1)) # Buffer for safety
             
             if not deals:
@@ -851,12 +874,8 @@ class XAUUSDBot:
                         deal_time = datetime.fromtimestamp(deal.time).strftime('%Y-%m-%d %H:%M:%S')
                         deal_type = "BUY" if deal.type == 0 else "SELL"
                         
-                        # Extract Strategy from Comment (Format: "Bot STRATEGY_NAME")
-                        strategy_used = "Unknown"
-                        if deal.comment and deal.comment.startswith("Bot "):
-                            strategy_used = deal.comment.replace("Bot ", "").strip()
-                        elif deal.comment:
-                             strategy_used = deal.comment
+                        # Use actual strategy name
+                        strategy_used = self.strategy_name
                         
                         status = "UNKNOWN"
                         if deal.reason == mt5.DEAL_REASON_TP:
@@ -880,6 +899,9 @@ class XAUUSDBot:
                             f"Status: <b>{status}</b>"
                         )
                         
+                        # Log TOTAL PROFIT including costs (Swap & Commission)
+                        total_profit = deal.profit + deal.swap + deal.commission
+
                         writer.writerow([
                             deal_time, 
                             deal.ticket, 
@@ -887,7 +909,7 @@ class XAUUSDBot:
                             deal_type, 
                             deal.volume, 
                             deal.price, 
-                            deal.profit, 
+                            round(total_profit, 2), 
                             deal.comment,
                             status
                         ])
