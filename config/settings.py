@@ -55,8 +55,8 @@ class Config:
     
     # --- Auto Risk Management (ATR Based) ---
     ENABLE_AUTO_RISK = True     # ✅ Enabled ATR SL (More dynamic)
-    ATR_SL_MULT = 1.2           # 🔧 M5: ลด Buffer เหลือ 1.2 (กันสะบัดน้อยลง)
-    ATR_TP_MULT = 2.4           # TP = Price +/- (ATR * 2.4) (Risk:Reward 1:2)
+    ATR_SL_MULT = 1.6           # 🔧 M5: เพิ่มเป็๋น 1.6 เพื่อลดการสะบัดชน SL (Breathing room)
+    ATR_TP_MULT = 4.0           # 🎯 TP = ATR * 4.0 (รักษา RR 1:2.5 ตามแผน)
 
     DAILY_PROFIT_TARGET = 500.0 # เป้าหมายกำไรรายวัน ($) -> ถ้าถึงแล้วหยุดเทรด
 

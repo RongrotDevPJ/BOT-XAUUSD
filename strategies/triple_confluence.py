@@ -44,14 +44,10 @@ class TripleConfluenceStrategy(BaseStrategy):
         is_uptrend = price_close > ema_200
         is_downtrend = price_close < ema_200
         
-        # 2. & 3. Value and Momentum (Relaxed: Check last 5 candles for confluence)
+        # 2. & 3. Value and Momentum (Bollinger Bands Check)
         lookback_window = df.iloc[row_index-4 : row_index+1] # Last 5 relative to row_index
-        
         touched_lower = any(lookback_window['low'] <= lookback_window['bb_lower'])
         touched_upper = any(lookback_window['high'] >= lookback_window['bb_upper'])
-        
-        is_oversold = any(lookback_window['rsi'] < Config.RSI_OVERSOLD)
-        is_overbought = any(lookback_window['rsi'] > Config.RSI_OVERBOUGHT)
 
         
         # Check Trading Hours
@@ -62,6 +58,17 @@ class TripleConfluenceStrategy(BaseStrategy):
         if not is_trading_time:
              return "SLEEP", f"💤 Sleeping (Time) | Server Time: {server_time.strftime('%H:%M')}", extra_data
 
+        # 2. & 3. Value and Momentum (RSI Reversal Confirmation)
+        # We check if RSI was OS/OB recently and is now crossing back
+        lookback_prev = df.iloc[row_index-5 : row_index] # Last 5 candles before current
+        was_oversold = any(lookback_prev['rsi'] < Config.RSI_OVERSOLD)
+        was_overbought = any(lookback_prev['rsi'] > Config.RSI_OVERBOUGHT)
+        
+        # Current Momentum Confirmation: RSI must be above OS or below OB
+        # (Wait for recovery from extreme zones)
+        is_recovering_from_os = rsi >= Config.RSI_OVERSOLD and was_oversold
+        is_recovering_from_ob = rsi <= Config.RSI_OVERBOUGHT and was_overbought
+
         # --- NEW: Multi-Timeframe (MTF) Trend Filter ---
         mtf_trend = self.bot.get_mtf_trend()
         buy_mtf_ok = (mtf_trend in ["UP", "READY", "Unknown"])
@@ -69,14 +76,14 @@ class TripleConfluenceStrategy(BaseStrategy):
 
         # --- ENTRY SIGNAL ---
         # ต้องครบ 3 เงื่อนไขหลัก + MTF Filter
-        if is_uptrend and touched_lower and is_oversold:
+        if is_uptrend and touched_lower and is_recovering_from_os:
             if not buy_mtf_ok:
                 status_detail = f"WAIT [TRPL | Up + BB Low | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
             elif not self.bot.check_open_positions():
                 signal = "BUY"
                 status_detail = f"🚀 BUY | TRPL | Up + BB Low | RSI:{rsi:.1f} | MTF:OK"
                 
-        elif is_downtrend and touched_upper and is_overbought:
+        elif is_downtrend and touched_upper and is_recovering_from_ob:
              if not sell_mtf_ok:
                  status_detail = f"WAIT [TRPL | Down + BB Up | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
              elif not self.bot.check_open_positions():

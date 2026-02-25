@@ -30,21 +30,31 @@ class TradingLogic:
         trend_status = "UP 📈" if close_price > ema_trend else "DOWN 📉"
         status_msg = f"🔍 Signal check | RSI: {rsi_val:.2f} | Price: {close_price:.2f} | EMA200: {ema_trend:.2f} ({trend_status})"
         
+        # --- MOMENTUM REVERSAL CHECK ---
+        # Look back at last 5 candles for OB/OS hit
+        lookback_prev = df.iloc[-6:-1]
+        was_oversold = any(lookback_prev['rsi'] < config.RSI_OVERSOLD)
+        was_overbought = any(lookback_prev['rsi'] > config.RSI_OVERBOUGHT)
+        
+        # Current momentum confirmation (Coming out of OB/OS)
+        is_recovering_from_os = rsi_val >= config.RSI_OVERSOLD and was_oversold
+        is_recovering_from_ob = rsi_val <= config.RSI_OVERBOUGHT and was_overbought
+
         # BUY LOGIC
-        if rsi_val < config.RSI_OVERSOLD:
+        if is_recovering_from_os:
             if close_price > ema_trend:
-                logging.info(f"{status_msg} 🟢 BUY SIGNAL DETECTED")
+                logging.info(f"{status_msg} 🟢 BUY SIGNAL (RSI Reversal)")
                 return 'buy'
             else:
-                logging.info(f"{status_msg} ⚠️ Skip BUY: RSI is Oversold but Price is below EMA200 (Requires Uptrend)")
+                logging.info(f"{status_msg} ⚠️ Skip BUY: RSI Recovers but Price is below EMA200")
         
         # SELL LOGIC
-        elif rsi_val > config.RSI_OVERBOUGHT:
+        elif is_recovering_from_ob:
             if close_price < ema_trend:
-                logging.info(f"{status_msg} 🔴 SELL SIGNAL DETECTED")
+                logging.info(f"{status_msg} 🔴 SELL SIGNAL (RSI Reversal)")
                 return 'sell'
             else:
-                logging.info(f"{status_msg} ⚠️ Skip SELL: RSI is Overbought but Price is above EMA200 (Requires Downtrend)")
+                logging.info(f"{status_msg} ⚠️ Skip SELL: RSI Recovers but Price is above EMA200")
         
         return None
 
