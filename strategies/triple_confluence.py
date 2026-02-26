@@ -58,16 +58,12 @@ class TripleConfluenceStrategy(BaseStrategy):
         if not is_trading_time:
              return "SLEEP", f"💤 Sleeping (Time) | Server Time: {server_time.strftime('%H:%M')}", extra_data
 
-        # 2. & 3. Value and Momentum (RSI Reversal Confirmation)
-        # We check if RSI was OS/OB recently and is now crossing back
-        lookback_prev = df.iloc[row_index-5 : row_index] # Last 5 candles before current
-        was_oversold = any(lookback_prev['rsi'] < Config.RSI_OVERSOLD)
-        was_overbought = any(lookback_prev['rsi'] > Config.RSI_OVERBOUGHT)
-        
-        # Current Momentum Confirmation: RSI must be above OS or below OB
-        # (Wait for recovery from extreme zones)
-        is_recovering_from_os = rsi >= Config.RSI_OVERSOLD and was_oversold
-        is_recovering_from_ob = rsi <= Config.RSI_OVERBOUGHT and was_overbought
+        # 2. & 3. Value and Momentum (RSI Momentum Filter)
+        # Instead of strict OS/OB recovery, we check if RSI confirms the bounce direction
+        # Buy: RSI > 40 (Not too weak, confirming momentum up)
+        # Sell: RSI < 60 (Not too strong, confirming momentum down)
+        rsi_bullish = rsi > 40
+        rsi_bearish = rsi < 60
 
         # --- NEW: Multi-Timeframe (MTF) Trend Filter ---
         mtf_trend = self.bot.get_mtf_trend()
@@ -76,14 +72,14 @@ class TripleConfluenceStrategy(BaseStrategy):
 
         # --- ENTRY SIGNAL ---
         # ต้องครบ 3 เงื่อนไขหลัก + MTF Filter
-        if is_uptrend and touched_lower and is_recovering_from_os:
+        if is_uptrend and touched_lower and rsi_bullish:
             if not buy_mtf_ok:
                 status_detail = f"WAIT [TRPL | Up + BB Low | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
             elif not self.bot.check_open_positions():
                 signal = "BUY"
                 status_detail = f"🚀 BUY | TRPL | Up + BB Low | RSI:{rsi:.1f} | MTF:OK"
                 
-        elif is_downtrend and touched_upper and is_recovering_from_ob:
+        elif is_downtrend and touched_upper and rsi_bearish:
              if not sell_mtf_ok:
                  status_detail = f"WAIT [TRPL | Down + BB Up | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
              elif not self.bot.check_open_positions():

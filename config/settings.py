@@ -15,7 +15,7 @@ class Config:
     MAX_SPREAD_POINTS = 50      # ❗ กรอง Spread ไม่ให้เกิน 50 จุด (กันช่วงข่าว/ตลาดเปิด)
     SYMBOL = "XAUUSD"
 
-    TIMEFRAME = mt5.TIMEFRAME_M5   # 🚀 Timeframe: M5 (Standard for Triple Confluence)
+    TIMEFRAME = mt5.TIMEFRAME_M15  # 🚀 Timeframe: M15 (Gives more reliable signals with less noise)
     MAGIC_NUM = 888888             # 🎱 Lucky Magic Number (Triple Confluence)
     DEVIATION = 20                 # ค่าความคลาดเคลื่อนที่ยอมรับได้ (Slippage)
     USE_REALTIME_CANDLE = False     # 🚀 True = เทรดแท่งปัจจุบัน (ไวแต่เสี่ยง Repaint), False = รอจบแท่ง (ชัวร์กว่า)
@@ -32,9 +32,9 @@ class Config:
     # RISK_DIVISOR = 5000 
     
     # 🌟 NEW: Risk-Based MM (% Per Trade)
-    ENABLE_RISK_PER_TRADE = False   # ❌ Disable Risk % (Use Divisor for Cent)
+    ENABLE_RISK_PER_TRADE = True    # ✅ Enable Risk % (Calculates Lot size automatically based on SL points)
     RISK_DIVISOR = 10000            # 💰 Cent Account: 1000/10000 = 0.10 Lot
-    RISK_PERCENT = 1.0              # (Ignored)
+    RISK_PERCENT = 1.0              # 🛡️ 1% Risk per trade
     MAX_LOT_SIZE = 10.0             # Safety Cap
     MIN_LOT = 0.01          # ออกขั้นต่ำสุด
 
@@ -64,14 +64,14 @@ class Config:
     USE_SWING_SL = False        # ❌ Disable Swing SL (Use Fixed 500pts for controlled risk)
     SWING_LOOKBACK = 20         # ย้อนหลังกี่แท่งเพื่อหา Swing High/Low
     RISK_REWARD_RATIO = 2.5     # TP ต้องเป็น 2.5 เท่าของ SL (RR 1:2.5) 📈 🎯
-    MAX_SL_POINTS = 500         # 🛡️ M5: จำกัด Max SL 500 จุด (ถ้าเกินไม่เล่น)
+    MAX_SL_POINTS = 1000        # 🛡️ M15: ขยาย Max SL เป็น 1000 จุด (ครอบคลุมระยะสะบัด ควบคุม Risk ผ่าน Lot แทน)
 
     # =========================================
     # 🛡️ 4. SETTINGS: PROFIT PROTECTION (ล็อกกำไร)
     # =========================================
-    # Stage 1: Break Even (40% of TP)
+    # Stage 1: Break Even (50% of TP)
     ENABLE_BREAK_EVEN = True    # เปิดใช้ระบบขยับ SL บังทุน
-    BREAK_EVEN_PERCENT = 0.4    # 🎯 บังทุนเมื่อกำไรถึง 40% ของระยะ TP
+    BREAK_EVEN_PERCENT = 0.5    # 🎯 บังทุนเมื่อกำไรถึง 50% ของระยะ TP (เพิ่มระยะหายใจตอนย่อ)
     BREAK_EVEN_LOCK = 100       # ล็อคกำไรที่ 100 จุด (Entry + 100)
 
     # Stage 2: Profit Lock (65% of TP)
