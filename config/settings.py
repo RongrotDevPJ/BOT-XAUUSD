@@ -102,20 +102,20 @@ class Config:
     
     MACD_CONFIG = {
         'TIMEFRAME': mt5.TIMEFRAME_M15,
-        'STOP_LOSS_POINTS': 400,
-        'TAKE_PROFIT_POINTS': 1000,
+        'STOP_LOSS_POINTS': 650,     # ยึดตามค่ามาตรฐาน (650)
+        'TAKE_PROFIT_POINTS': 1625,  # ยึดตามค่ามาตรฐาน (1625)
         'ATR_SL_MULT': 1.5,
-        'ATR_TP_MULT': 3.75, # 1.5 * 2.5
-        'MAX_SL_POINTS': 500,
+        'ATR_TP_MULT': 3.75,         # 1.5 * 2.5
+        'MAX_SL_POINTS': 1000,       # ปรับเพิ่มให้เท่าตัวหลักป้องกันโดนตัดฟรี
     }
     
     SMC_CONFIG = {
-        'TIMEFRAME': mt5.TIMEFRAME_M5,
-        'STOP_LOSS_POINTS': 300,
-        'TAKE_PROFIT_POINTS': 750,
+        'TIMEFRAME': mt5.TIMEFRAME_M5,   
+        'STOP_LOSS_POINTS': 650,     # ยึดตามค่ามาตรฐาน (650)
+        'TAKE_PROFIT_POINTS': 1625,  # ยึดตามค่ามาตรฐาน (1625)
         'ATR_SL_MULT': 1.2,
-        'ATR_TP_MULT': 3.0, # 1.2 * 2.5
-        'MAX_SL_POINTS': 500,
+        'ATR_TP_MULT': 3.0,          # 1.2 * 2.5
+        'MAX_SL_POINTS': 1000,       # ปรับเพิ่มให้รองรับการสะบัดของ SMC
     }
 
     # =========================================
