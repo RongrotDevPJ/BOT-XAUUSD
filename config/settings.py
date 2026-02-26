@@ -32,8 +32,8 @@ class Config:
     # RISK_DIVISOR = 5000 
     
     # 🌟 NEW: Risk-Based MM (% Per Trade)
-    ENABLE_RISK_PER_TRADE = True    # ✅ Enable Risk % (Calculates Lot size automatically based on SL points)
-    RISK_DIVISOR = 2000            # 💰 Cent Account: 1000/10000 = 0.10 Lot
+    ENABLE_RISK_PER_TRADE = False   # ❌ ปิดการคำนวณแบบ % เพื่อใช้ RISK_DIVISOR ตามที่คุณต้องการ
+    RISK_DIVISOR = 5000             # 💰 ปรับลดความเสี่ยงเป็น หาร 5000 (ปลอดภัยขึ้นสำหรับ XAUUSD)
     RISK_PERCENT = 1.0              # 🛡️ 1% Risk per trade
     MAX_LOT_SIZE = 10.0             # Safety Cap
     MIN_LOT = 0.01          # ออกขั้นต่ำสุด
@@ -41,8 +41,8 @@ class Config:
     # =========================================
     # 🎯 3. SETTINGS: TARGETS & LIMITS (เป้าหมาย)
     # =========================================
-    STOP_LOSS_POINTS = 500      # 🛡️ FXIED SL: 500 Points ($5) for Safety
-    TAKE_PROFIT_POINTS = 1250   # 🎯 FIXED TP: 1250 Points (RR 1:2.5)
+    STOP_LOSS_POINTS = 650      # 🛡️ FXIED SL: 650 Points ($5) for Safety
+    TAKE_PROFIT_POINTS = 1625   # 🎯 FIXED TP: 1625 Points (RR 1:2.5)
     
     # 📱 Telegram Notifications
     TELEGRAM_ENABLED = True     # Set to True to enable
