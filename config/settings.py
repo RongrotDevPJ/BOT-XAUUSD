@@ -33,7 +33,7 @@ class Config:
     
     # 🌟 NEW: Risk-Based MM (% Per Trade)
     ENABLE_RISK_PER_TRADE = True    # ✅ Enable Risk % (Calculates Lot size automatically based on SL points)
-    RISK_DIVISOR = 10000            # 💰 Cent Account: 1000/10000 = 0.10 Lot
+    RISK_DIVISOR = 2000            # 💰 Cent Account: 1000/10000 = 0.10 Lot
     RISK_PERCENT = 1.0              # 🛡️ 1% Risk per trade
     MAX_LOT_SIZE = 10.0             # Safety Cap
     MIN_LOT = 0.01          # ออกขั้นต่ำสุด
@@ -80,7 +80,15 @@ class Config:
     PROFIT_LOCK_LEVEL = 0.5     # ขยับ SL มาที่ 50% ของระยะ TP
 
     
-    # (Legacy Trailing and Dynamic TP Removed)
+    # --- Trailing Stop (Dynamic SL) ---
+    TRAILING_STOP_TRIGGER = 200 # เริ่มทำงานเมื่อกำไรถึง X จุด
+    TRAILING_STOP_LOCK = 150    # ตีตัวออกห่างจากราคาปัจจุบัน X จุด (Trailing Distance)
+    TRAILING_STOP_STEP = 50     # ขยับ SL ทุกๆ 50 จุด (ป้องกัน MT5 ส่งคำสั่งถี่เกินไป)
+
+    # --- Dynamic TP Extension ---
+    ENABLE_DYNAMIC_TP = True
+    TP_EXTENSION_TRIGGER = 200  # ถ้าเข้าใกล้เป้าหมาย 200 จุด ให้ยืด TP ออกไป
+    TP_EXTENSION_DISTANCE = 500 # ยืด TP ออกไปอีก 500 จุด
 
     # --- NEW: Partial Take Profit (แบ่งปิดกำไร) ---
     ENABLE_PARTIAL_TP = True    # ✅ Enable Partial TP (0.10 -> Close 0.05)
