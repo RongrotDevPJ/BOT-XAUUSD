@@ -711,7 +711,7 @@ class XAUUSDBot:
                                         logging.info(f"🔒 Stage 2: Profit Lock (50%) for Ticket {ticket}")
                                         self.send_telegram_message(f"🔒 <b>PROFIT LOCK (65% TP)</b>\nTicket: <code>{ticket}</code>\nSL moved to 50% TP: <code>{target_lock:.2f}</code>")
 
-                if Config.ENABLE_PARTIAL_TP and ticket not in self.partially_closed_tickets:
+                if getattr(Config, 'ENABLE_PARTIAL_TP', False) and ticket not in self.partially_closed_tickets:
                     current_profit_points = 0
                     if order_type == 0: current_profit_points = (price_current - price_open) / point
                     else: current_profit_points = (price_open - price_current) / point
@@ -722,7 +722,7 @@ class XAUUSDBot:
                     
                     if current_profit_points >= trigger_points:
                          if pos.volume >= (Config.MIN_LOT * 2): 
-                             vol_to_close = round(pos.volume * Config.PARTIAL_TP_RATIO, 2)
+                             vol_to_close = round(pos.volume * getattr(Config, 'PARTIAL_TP_RATIO', 0.5), 2)
                              if vol_to_close >= Config.MIN_LOT:
                                  logging.info(f"💰 Partial TP Trigger (1:1 RR)! Profit: {current_profit_points:.0f}pts. Closing {vol_to_close} lots...")
                                  if self.close_partial(ticket, vol_to_close):
@@ -733,44 +733,6 @@ class XAUUSDBot:
                                          self.send_telegram_message(f"💰 <b>PARTIAL TP (1:1 RR)</b>\nTicket: <code>{ticket}</code>\nClosed: <code>{vol_to_close}</code> lots\nSL moved to BE.")
                                      continue 
 
-                # 2. Trailing Stop Logic (Dynamic)
-                # BUY Order
-                if order_type == 0:
-                    profit_points = (price_current - price_open) / point
-                    if profit_points > Config.TRAILING_STOP_TRIGGER:
-                        trailing_dist = Config.TRAILING_STOP_LOCK * point
-                        target_sl = price_current - trailing_dist
-                        
-                        if sl < target_sl and (target_sl - sl) >= (Config.TRAILING_STOP_STEP * point):
-                            if self.modify_order(ticket, target_sl, tp):
-                                self.send_telegram_message(f"📈 <b>TRAILING SL MOVED (BUY)</b>\nTicket: <code>{ticket}</code>\nNew SL: <code>{target_sl:.2f}</code>")
-
-                    if Config.ENABLE_DYNAMIC_TP:
-                        dist_to_tp = (tp - price_current) / point
-                        if dist_to_tp <= Config.TP_EXTENSION_TRIGGER and dist_to_tp > 0:
-                            new_tp = tp + (Config.TP_EXTENSION_DISTANCE * point)
-                            if self.modify_order(ticket, sl, new_tp):
-                                logging.info(f"🚀 TP Extended! Ticket: {ticket} | Old TP: {tp} -> New TP: {new_tp}")
-                                self.send_telegram_message(f"🚀 <b>TP EXTENDED (BUY)</b>\nTicket: <code>{ticket}</code>\nNew TP: <code>{new_tp:.2f}</code>")
-
-                # SELL Order
-                elif order_type == 1:
-                    profit_points = (price_open - price_current) / point
-                    if profit_points > Config.TRAILING_STOP_TRIGGER:
-                        trailing_dist = Config.TRAILING_STOP_LOCK * point
-                        target_sl = price_current + trailing_dist
-                        
-                        if (sl > target_sl or sl == 0) and (sl == 0 or (sl - target_sl) >= (Config.TRAILING_STOP_STEP * point)):
-                            if self.modify_order(ticket, target_sl, tp):
-                                self.send_telegram_message(f"📉 <b>TRAILING SL MOVED (SELL)</b>\nTicket: <code>{ticket}</code>\nNew SL: <code>{target_sl:.2f}</code>")
-
-                    if Config.ENABLE_DYNAMIC_TP:
-                        dist_to_tp = (price_current - tp) / point
-                        if dist_to_tp <= Config.TP_EXTENSION_TRIGGER and dist_to_tp > 0:
-                            new_tp = tp - (Config.TP_EXTENSION_DISTANCE * point)
-                            if self.modify_order(ticket, sl, new_tp):
-                                logging.info(f"🚀 TP Extended! Ticket: {ticket} | Old TP: {tp} -> New TP: {new_tp}")
-                                self.send_telegram_message(f"🚀 <b>TP EXTENDED (SELL)</b>\nTicket: <code>{ticket}</code>\nNew TP: <code>{new_tp:.2f}</code>")
                             
         except Exception as e:
             logging.error(f"Trailing Stop Error: {e}")
