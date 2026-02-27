@@ -34,7 +34,7 @@ class Config:
     # 🌟 NEW: Risk-Based MM (% Per Trade)
     ENABLE_RISK_PER_TRADE = True    # ✅ เปิดการคำนวณแบบ % เพื่อความแม่นยำ (Every trade risks the same %)
     # RISK_DIVISOR = 5000           # (Disabled in favor of % Risk)
-    RISK_PERCENT = 1.0              # 🛡️ 1% Risk per trade
+    RISK_PERCENT = 5.0              # 🛡️ 1% Risk per trade
     MAX_LOT_SIZE = 10.0             # Safety Cap
     MIN_LOT = 0.01          # ออกขั้นต่ำสุด
 
@@ -60,7 +60,7 @@ class Config:
 
     DAILY_PROFIT_TARGET = 500.0 # เป้าหมายกำไรรายวัน ($) -> ถ้าถึงแล้วหยุดเทรด
     ENABLE_DAILY_DRAWDOWN_LIMIT = True # ✅ เปิดระบบป้องกันพอร์ตแตกรายวัน
-    MAX_DAILY_LOSS_PERCENT = 3.0 # 🛡️ ขีดจำกัดการขาดทุนรายวัน (3% ของ Balance) -> ถ้าถึงแล้วหยุดเทรด
+    MAX_DAILY_LOSS_PERCENT = 10 # 🛡️ ขีดจำกัดการขาดทุนรายวัน (3% ของ Balance) -> ถ้าถึงแล้วหยุดเทรด
 
     # --- Swing High/Low Strategy ---
     USE_SWING_SL = False        # ❌ Disable Swing SL (Use Fixed 500pts for controlled risk)
