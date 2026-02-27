@@ -965,18 +965,19 @@ class XAUUSDBot:
                      continue
                 
                 # Check Daily Drawdown (Loss Limit)
-                account_info = mt5.account_info()
-                if account_info:
-                    balance = account_info.balance
-                    max_loss_usd = balance * (Config.MAX_DAILY_LOSS_PERCENT / 100.0)
-                    if daily_profit <= -max_loss_usd:
-                        msg = f"🛡️ DAILY DRAWDOWN REACHED! (${daily_profit:.2f} limit: -${max_loss_usd:.2f} [{Config.MAX_DAILY_LOSS_PERCENT}%])"
-                        logging.warning(msg)
-                        # Replace '<=' with words or HTML-safe characters for Telegram
-                        tg_msg = f"⚠️ <b>STOP TRADING: DRAWDOWN</b>\nDaily Loss: <code>${daily_profit:.2f}</code>\nLimit: <code>-${max_loss_usd:.2f}</code>\n<i>Bot paused for safety.</i>"
-                        self.send_telegram_message(tg_msg)
-                        time.sleep(3600) # Sleep for an hour and re-check
-                        continue
+                if getattr(Config, 'ENABLE_DAILY_DRAWDOWN_LIMIT', True):
+                    account_info = mt5.account_info()
+                    if account_info:
+                        balance = account_info.balance
+                        max_loss_usd = balance * (Config.MAX_DAILY_LOSS_PERCENT / 100.0)
+                        if daily_profit <= -max_loss_usd:
+                            msg = f"🛡️ DAILY DRAWDOWN REACHED! (${daily_profit:.2f} limit: -${max_loss_usd:.2f} [{Config.MAX_DAILY_LOSS_PERCENT}%])"
+                            logging.warning(msg)
+                            # Replace '<=' with words or HTML-safe characters for Telegram
+                            tg_msg = f"⚠️ <b>STOP TRADING: DRAWDOWN</b>\nDaily Loss: <code>${daily_profit:.2f}</code>\nLimit: <code>-${max_loss_usd:.2f}</code>\n<i>Bot paused for safety.</i>"
+                            self.send_telegram_message(tg_msg)
+                            time.sleep(3600) # Sleep for an hour and re-check
+                            continue
 
                 # 2. Time Filter (Done in strategy but we check here for global sleep? Strategy handles it.)
                 # Strategy logic handles forbidden hours/sleep mode signal.
@@ -1014,9 +1015,18 @@ class XAUUSDBot:
                     # 🖥️ DISPLAY LOGIC
                     current_time = time.time()
                     if current_time - last_log_time >= 60: # Log every minute
-                        # Log concise summary with indicator values
-                        ind_summary = f"RSI:{extra_data.get('rsi',0):.1f} | EMA:{'OK' if price > extra_data.get('ema_trend',0) else 'NO'}"
-                        print(f"[{datetime.now().strftime('%H:%M')}] {status_detail} | {ind_summary}")
+                        # Log concise summary flexibly based on what strategy provides
+                        ind_parts = []
+                        if 'rsi' in extra_data:
+                            ind_parts.append(f"RSI:{extra_data['rsi']:.1f}")
+                        if 'ema_trend' in extra_data:
+                            ind_parts.append(f"EMA:{'OK' if price > extra_data['ema_trend'] else 'NO'}")
+                        ind_summary = " | ".join(ind_parts)
+                        
+                        if ind_summary:
+                            print(f"[{datetime.now().strftime('%H:%M')}] {status_detail} | {ind_summary}")
+                        else:
+                            print(f"[{datetime.now().strftime('%H:%M')}] {status_detail}")
                         last_log_time = current_time
 
                     if signal in ["BUY", "SELL"]:
