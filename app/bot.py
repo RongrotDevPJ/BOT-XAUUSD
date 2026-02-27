@@ -970,9 +970,11 @@ class XAUUSDBot:
                     balance = account_info.balance
                     max_loss_usd = balance * (Config.MAX_DAILY_LOSS_PERCENT / 100.0)
                     if daily_profit <= -max_loss_usd:
-                        msg = f"🛡️ DAILY DRAWDOWN REACHED! (${daily_profit:.2f} <= -${max_loss_usd:.2f} [{Config.MAX_DAILY_LOSS_PERCENT}%])"
+                        msg = f"🛡️ DAILY DRAWDOWN REACHED! (${daily_profit:.2f} limit: -${max_loss_usd:.2f} [{Config.MAX_DAILY_LOSS_PERCENT}%])"
                         logging.warning(msg)
-                        self.send_telegram_message(f"⚠️ <b>STOP TRADING: DRAWDOWN</b>\n{msg}\n<i>Bot paused for safety.</i>")
+                        # Replace '<=' with words or HTML-safe characters for Telegram
+                        tg_msg = f"⚠️ <b>STOP TRADING: DRAWDOWN</b>\nDaily Loss: <code>${daily_profit:.2f}</code>\nLimit: <code>-${max_loss_usd:.2f}</code>\n<i>Bot paused for safety.</i>"
+                        self.send_telegram_message(tg_msg)
                         time.sleep(3600) # Sleep for an hour and re-check
                         continue
 
