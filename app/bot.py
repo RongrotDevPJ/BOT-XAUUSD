@@ -952,15 +952,29 @@ class XAUUSDBot:
                         time.sleep(60)
                         continue
 
-                # 1. Daily Target Check
+                # 1. Daily Target & Drawdown Check
                 daily_profit = self.get_daily_profit()
+                
+                # Check Daily Profit Target
                 if daily_profit >= Config.DAILY_PROFIT_TARGET:
-                     msg = f"💰 Daily Target Reached! (${daily_profit:.2f} / ${Config.DAILY_PROFIT_TARGET})"
+                     msg = f"🏆 Daily Target Reached! (${daily_profit:.2f} / ${Config.DAILY_PROFIT_TARGET})"
                      logging.info(msg)
                      self.send_telegram_message(f"🏆 <b>GOAL REACHED</b>\n{msg}\n<i>Sleeping until tomorrow...</i>")
                      logging.info("Sleeping until tomorrow...")
                      time.sleep(3600) 
                      continue
+                
+                # Check Daily Drawdown (Loss Limit)
+                account_info = mt5.account_info()
+                if account_info:
+                    balance = account_info.balance
+                    max_loss_usd = balance * (Config.MAX_DAILY_LOSS_PERCENT / 100.0)
+                    if daily_profit <= -max_loss_usd:
+                        msg = f"🛡️ DAILY DRAWDOWN REACHED! (${daily_profit:.2f} <= -${max_loss_usd:.2f} [{Config.MAX_DAILY_LOSS_PERCENT}%])"
+                        logging.warning(msg)
+                        self.send_telegram_message(f"⚠️ <b>STOP TRADING: DRAWDOWN</b>\n{msg}\n<i>Bot paused for safety.</i>")
+                        time.sleep(3600) # Sleep for an hour and re-check
+                        continue
 
                 # 2. Time Filter (Done in strategy but we check here for global sleep? Strategy handles it.)
                 # Strategy logic handles forbidden hours/sleep mode signal.
@@ -998,7 +1012,9 @@ class XAUUSDBot:
                     # 🖥️ DISPLAY LOGIC
                     current_time = time.time()
                     if current_time - last_log_time >= 60: # Log every minute
-                        print(f"[{datetime.now().strftime('%H:%M')}] {status_detail} | Price: {price}")
+                        # Log concise summary with indicator values
+                        ind_summary = f"RSI:{extra_data.get('rsi',0):.1f} | EMA:{'OK' if price > extra_data.get('ema_trend',0) else 'NO'}"
+                        print(f"[{datetime.now().strftime('%H:%M')}] {status_detail} | {ind_summary}")
                         last_log_time = current_time
 
                     if signal in ["BUY", "SELL"]:

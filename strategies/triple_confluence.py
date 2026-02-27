@@ -28,6 +28,9 @@ class TripleConfluenceStrategy(BaseStrategy):
         bb_lower = prev['bb_lower']
         rsi = prev['rsi']
         
+        # Candlestick Pattern check on the signal candle
+        pattern = Indicators.check_candlestick_pattern(df, row_index)
+        
         signal = "WAIT"
         status_detail = "WAIT"
         extra_data = {
@@ -35,7 +38,8 @@ class TripleConfluenceStrategy(BaseStrategy):
             "ema_trend": ema_200,
             "rsi": rsi,
             "bb_lower": bb_lower,
-            "bb_upper": bb_upper
+            "bb_upper": bb_upper,
+            "pattern": pattern if pattern else "None"
         }
 
         # --- FINAL DECISION (Triple Confluence) ---
@@ -71,20 +75,28 @@ class TripleConfluenceStrategy(BaseStrategy):
         sell_mtf_ok = (mtf_trend in ["DOWN", "READY", "Unknown"])
 
         # --- ENTRY SIGNAL ---
-        # ต้องครบ 3 เงื่อนไขหลัก + MTF Filter
+        # ต้องครบ 3 เงื่อนไขหลัก + MTF Filter + Candlestick Pattern
         if is_uptrend and touched_lower and rsi_bullish:
+            has_bull_pattern = pattern in ["BULLISH_PINBAR", "BULLISH_ENGULFING"]
+            
             if not buy_mtf_ok:
                 status_detail = f"WAIT [TRPL | Up + BB Low | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
+            elif not has_bull_pattern:
+                status_detail = f"WAIT [TRPL | Up + BB Low | RSI:{rsi:.1f} | Waiting for Pattern 🏮]"
             elif not self.bot.check_open_positions():
                 signal = "BUY"
-                status_detail = f"🚀 BUY | TRPL | Up + BB Low | RSI:{rsi:.1f} | MTF:OK"
+                status_detail = f"🚀 BUY | TRPL | Up + BB Low | {pattern} | RSI:{rsi:.1f} | MTF:OK"
                 
         elif is_downtrend and touched_upper and rsi_bearish:
+             has_bear_pattern = pattern in ["BEARISH_PINBAR", "BEARISH_ENGULFING"]
+             
              if not sell_mtf_ok:
                  status_detail = f"WAIT [TRPL | Down + BB Up | RSI:{rsi:.1f} | Filtered by MTF: {mtf_trend} ❌]"
+             elif not has_bear_pattern:
+                 status_detail = f"WAIT [TRPL | Down + BB Up | RSI:{rsi:.1f} | Waiting for Pattern 🏮]"
              elif not self.bot.check_open_positions():
                 signal = "SELL"
-                status_detail = f"📉 SELL | TRPL | Down + BB Up | RSI:{rsi:.1f} | MTF:OK"
+                status_detail = f"📉 SELL | TRPL | Down + BB Up | {pattern} | RSI:{rsi:.1f} | MTF:OK"
 
         else:
             # Status for monitoring

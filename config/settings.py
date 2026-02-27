@@ -32,8 +32,8 @@ class Config:
     # RISK_DIVISOR = 5000 
     
     # 🌟 NEW: Risk-Based MM (% Per Trade)
-    ENABLE_RISK_PER_TRADE = False   # ❌ ปิดการคำนวณแบบ % เพื่อใช้ RISK_DIVISOR ตามที่คุณต้องการ
-    RISK_DIVISOR = 5000             # 💰 ปรับลดความเสี่ยงเป็น หาร 5000 (ปลอดภัยขึ้นสำหรับ XAUUSD)
+    ENABLE_RISK_PER_TRADE = True    # ✅ เปิดการคำนวณแบบ % เพื่อความแม่นยำ (Every trade risks the same %)
+    # RISK_DIVISOR = 5000           # (Disabled in favor of % Risk)
     RISK_PERCENT = 1.0              # 🛡️ 1% Risk per trade
     MAX_LOT_SIZE = 10.0             # Safety Cap
     MIN_LOT = 0.01          # ออกขั้นต่ำสุด
@@ -59,6 +59,7 @@ class Config:
     ATR_TP_MULT = 4.0           # 🎯 TP = ATR * 4.0 (รักษา RR 1:2.5 ตามแผน)
 
     DAILY_PROFIT_TARGET = 500.0 # เป้าหมายกำไรรายวัน ($) -> ถ้าถึงแล้วหยุดเทรด
+    MAX_DAILY_LOSS_PERCENT = 3.0 # 🛡️ ขีดจำกัดการขาดทุนรายวัน (3% ของ Balance) -> ถ้าถึงแล้วหยุดเทรด
 
     # --- Swing High/Low Strategy ---
     USE_SWING_SL = False        # ❌ Disable Swing SL (Use Fixed 500pts for controlled risk)
